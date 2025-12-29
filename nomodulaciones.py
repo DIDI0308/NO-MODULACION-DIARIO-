@@ -14,7 +14,7 @@ if uploaded_file is not None:
         # 1. Cargar datos (Hoja específica)
         df = pd.read_excel(uploaded_file, sheet_name="3.30.8")
         
-        # LIMPIEZA TOTAL DE COLUMNAS (Elimina espacios como "Motivo    ")
+        # LIMPIEZA TOTAL DE COLUMNAS (Elimina espacios ocultos en "Motivo    ", "Cam", etc.)
         df.columns = df.columns.str.strip()
 
         # --- PROCESAMIENTO BASE ---
@@ -95,16 +95,16 @@ if uploaded_file is not None:
             # Sin repetidos según 'Client', manteniendo solo el primero
             resultado_tabla = df_final_clientes.drop_duplicates(subset=['Client'], keep='first')
 
-            # Columnas estrictamente solicitadas
-            columnas_finales = ['Client', 'F.Pedido', 'Motivo']
+            # Columnas estrictamente solicitadas en el orden pedido
+            columnas_finales = ['Client', 'Cam', 'F.Pedido', 'Motivo']
             
-            # Aseguramos que solo se intenten mostrar las que existen
+            # Aseguramos que solo se intenten mostrar las que existen en el DataFrame
             cols_ok = [c for c in columnas_finales if c in resultado_tabla.columns]
 
-            st.write(f"Resultados encontrados: **{len(resultado_tabla)}**")
+            st.write(f"Resultados encontrados para el día seleccionado: **{len(resultado_tabla)}**")
             st.dataframe(resultado_tabla[cols_ok], use_container_width=True, hide_index=True)
         else:
-            st.warning("No se encontraron registros que cumplan la condición de 'No Modulado'.")
+            st.warning("No se encontraron registros de Clientes No Modulados.")
 
     except Exception as e:
         st.error(f"Error en el procesamiento: {e}")

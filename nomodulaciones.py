@@ -1,76 +1,78 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(page_title="Analizador Avanzado", layout="wide")
+st.set_page_config(page_title="Analizador Avanzado 3.30.8", layout="wide")
 
-st.title("📂 Procesador de Hoja 3.30.8")
+st.title("📊 Análisis Específico - Hoja 3.30.8")
 
-uploaded_file = st.file_uploader("Elige un archivo Excel", type=['xlsx'])
+uploaded_file = st.file_uploader("Sube tu archivo Excel", type=['xlsx'])
 
 if uploaded_file is not None:
     try:
+        # 1. Verificar si existe la hoja
         excel_file = pd.ExcelFile(uploaded_file)
-        hoja_objetivo = "3.30.8"
+        if "3.30.8" in excel_file.sheet_names:
+            
+            # Leer la hoja específica
+            # Nota: Si tus columnas no tienen encabezados, añade header=None
+            df = pd.read_excel(uploaded_file, sheet_name="3.30.8")
 
-        if hoja_objetivo in excel_file.sheet_names:
-            # 1. Leer la hoja
-            df = pd.read_excel(uploaded_file, sheet_name=hoja_objetivo)
-
-            # Asegurar que la columna X sea de tipo fecha (ajustar nombre si tiene espacios)
-            if 'X' in df.columns:
-                df['X'] = pd.to_datetime(df['X'], errors='coerce')
-                
-                # --- SECCIÓN DE FILTROS EN EL LATERAL (SIDEBAR) ---
-                st.sidebar.header("Filtros")
-                
-                # Filtro por fechas (Columna X)
-                min_date = df['X'].min().date()
-                max_date = df['X'].max().date()
-                
+            # --- PROCESAMIENTO DE DATOS ---
+            
+            # Convertir columna 'x' a fecha (manejando errores)
+            df['x'] = pd.to_datetime(df['x'], errors='coerce')
+            
+            # --- FILTROS EN BARRA LATERAL ---
+            st.sidebar.header("Filtros de Datos")
+            
+            # Filtro de Fechas (Columna X)
+            min_date = df['x'].min().date() if not df['x'].dropna().empty else None
+            max_date = df['x'].max().date() if not df['x'].dropna().empty else None
+            
+            if min_date and max_date:
                 fecha_rango = st.sidebar.date_input(
                     "Selecciona rango de fechas (Columna X)",
-                    value=(min_date, max_date),
+                    [min_date, max_date],
                     min_value=min_date,
                     max_value=max_date
                 )
-
-                # --- APLICAR FILTROS ---
-                # Aplicar filtro de fecha
-                if len(fecha_rango) == 2:
-                    start_date, end_date = fecha_rango
-                    mask = (df['X'].dt.date >= start_date) & (df['X'].dt.date <= end_date)
-                    df_filtrado = df.loc[mask]
-                else:
-                    df_filtrado = df.copy()
-
-                # Filtro Columna AM == 88
-                if 'AM' in df_filtrado.columns:
-                    df_filtrado = df_filtrado[df_filtrado['AM'] == 88]
-                else:
-                    st.error("No se encontró la columna 'AM'")
-
-                # --- RESULTADOS ---
-                st.subheader(f"📊 Resultados para hoja {hoja_objetivo}")
-                
-                # Contar valores únicos de la Columna A
-                if 'A' in df_filtrado.columns:
-                    conteo_unicos = df_filtrado['A'].nunique()
-                    
-                    # Mostrar métrica destacada
-                    col1, col2 = st.columns(2)
-                    col1.metric("Valores únicos en Columna A", conteo_unicos)
-                    col2.metric("Total filas filtradas", len(df_filtrado))
-                    
-                    st.markdown("---")
-                    st.write("Vista previa de los datos filtrados:")
-                    st.dataframe(df_filtrado)
-                else:
-                    st.error("No se encontró la columna 'A'")
-            
             else:
-                st.error("La columna 'X' no existe en esta hoja.")
-        else:
-            st.error(f"La hoja '{hoja_objetivo}' no existe.")
+                st.sidebar.warning("No se detectaron fechas válidas en la columna 'x'")
+                fecha_rango = None
 
+            # --- APLICACIÓN DE FILTROS ---
+            
+            # 1. Filtro de columna 'am' == 88
+            df_filtrado = df[df['am'] == 88]
+            
+            # 2. Filtro de rango de fechas
+            if fecha_rango and len(fecha_rango) == 2:
+                start_date, end_date = fecha_rango
+                df_filtrado = df_filtrado[
+                    (df_filtrado['x'].dt.date >= start_date) & 
+                    (df_filtrado['x'].dt.date <= end_date)
+                ]
+
+            # --- VISUALIZACIÓN Y MÉTRICAS ---
+            
+            col1, col2 = st.columns(2)
+            
+            # Conteo de valores únicos en columna 'a'
+            valores_unicos_a = df_filtrado['a'].nunique()
+            
+            with col1:
+                st.metric("Valores únicos en 'a'", valores_unicos_a)
+            with col2:
+                st.metric("Registros encontrados", len(df_filtrado))
+
+            st.markdown("---")
+            st.subheader("Datos Filtrados")
+            st.write(f"Mostrando registros donde **am = 88** y fecha está en el rango seleccionado.")
+            st.dataframe(df_filtrado)
+
+        else:
+            st.error("No se encontró la hoja '3.30.8' en el archivo.")
+            
     except Exception as e:
-        st.error(f"Error: {e}")
+        st.error(f"Error al procesar: {e}")
+        st.info("Asegúrate de que las columnas 'x', 'am' y 'a' existan en la hoja.")

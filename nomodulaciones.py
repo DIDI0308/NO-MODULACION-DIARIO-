@@ -1,9 +1,10 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(page_title="Dashboard Modulación 3.30.8", layout="wide")
+st.set_page_config(page_title="Gráfico Modulación 3.30.8", layout="wide")
 
-st.title("📊 Análisis de Modulación por Periodos")
+st.title("📈 Gráfico de Rendimiento de Modulación")
+st.write("Visualización de cumplimiento (DPS 88) - Hoja 3.30.8")
 
 uploaded_file = st.file_uploader("Sube tu archivo Excel", type=['xlsx'])
 
@@ -33,33 +34,31 @@ if uploaded_file is not None:
 
         # --- FILTROS DE TIEMPO ---
         opcion = st.selectbox(
-            "Selecciona el periodo de análisis:",
+            "Selecciona el periodo para el gráfico:",
             ["Últimos 7 días", "Mes Actual (Calendario)", "Promedio Mensual (Histórico)"]
         )
 
-        # Fecha de referencia (la más reciente en el archivo)
         ultima_fecha = df_base['Entrega'].max()
         
         if opcion == "Últimos 7 días":
             fecha_limite = (ultima_fecha - pd.Timedelta(days=7)).date()
             df_final = df_base[df_base['Fecha'] > fecha_limite]
-            agrupar_por = 'Fecha'
+            eje_x = 'Fecha'
             
         elif opcion == "Mes Actual (Calendario)":
-            # Filtra estrictamente desde el día 1 del mes de la última fecha registrada
             mes_actual = ultima_fecha.month
             anio_actual = ultima_fecha.year
             df_final = df_base[(df_base['Entrega'].dt.month == mes_actual) & 
                                (df_base['Entrega'].dt.year == anio_actual)]
-            agrupar_por = 'Fecha'
+            eje_x = 'Fecha'
             
         else: # Promedio Mensual
             df_final = df_base.copy()
-            df_final['Periodo'] = df_base['Entrega'].dt.to_period('M')
-            agrupar_por = 'Periodo'
+            df_final['Periodo'] = df_base['Entrega'].dt.to_period('M').astype(str)
+            eje_x = 'Periodo'
 
-        # --- GENERACIÓN DE TABLA ---
-        resumen = df_final.groupby(agrupar_por).apply(
+        # --- GENERACIÓN DE DATOS PARA EL GRÁFICO ---
+        resumen = df_final.groupby(eje_x).apply(
             lambda x: pd.Series({
                 'Total Concatenados': x['CONCATENADO'].nunique(),
                 'Modulados': x[x['es_modulado']]['CONCATENADO'].nunique()
@@ -67,28 +66,27 @@ if uploaded_file is not None:
         ).reset_index()
 
         resumen['% Modulación'] = (resumen['Modulados'] / resumen['Total Concatenados']) * 100
-        resumen = resumen.sort_values(by=agrupar_por, ascending=False)
+        # Ordenar cronológicamente para el gráfico
+        resumen = resumen.sort_values(by=eje_x)
 
-        # --- VISUALIZACIÓN ---
+        # --- VISUALIZACIÓN DEL GRÁFICO ---
         st.markdown("---")
-        st.subheader(f"Vista: {opcion}")
-        
-        formatos = {
-            'Total Concatenados': '{:,.0f}',
-            'Modulados': '{:,.0f}',
-            '% Modulación': '{:.2f}%'
-        }
-        
-        if agrupar_por == 'Fecha':
-            formatos['Fecha'] = lambda x: x.strftime('%d/%m/%Y')
-        else:
-            formatos['Periodo'] = lambda x: str(x)
+        st.subheader(f"Evolución de % Modulación: {opcion}")
 
-        st.dataframe(
-            resumen.style.format(formatos), 
-            use_container_width=True,
-            hide_index=True
-        )
+        # Preparamos los datos para el gráfico (Eje X: Fecha/Periodo, Eje Y: %)
+        chart_data = resumen.set_index(eje_x)[['% Modulación']]
+        
+        # Mostramos el gráfico de barras
+        st.bar_chart(chart_data)
+
+        # También añadimos métricas clave debajo del gráfico para contexto
+        col1, col2, col3 = st.columns(3)
+        promedio_periodo = resumen['% Modulación'].mean()
+        max_periodo = resumen['% Modulación'].max()
+        
+        col1.metric("Promedio del Periodo", f"{promedio_periodo:.2f}%")
+        col2.metric("% Más Alto", f"{max_periodo:.2f}%")
+        col3.metric("Días/Meses Evaluados", len(resumen))
 
     except Exception as e:
-        st.error(f"Error al procesar el archivo.")
+        st.error(f"Error al generar el gráfico. Verifique los datos del archivo.")

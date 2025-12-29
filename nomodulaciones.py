@@ -3,9 +3,9 @@ import pandas as pd
 import plotly.express as px
 
 # Configuración de página
-st.set_page_config(page_title="Dashboard Modulación & Clientes", layout="wide")
+st.set_page_config(page_title="Reporte de modulación", layout="wide")
 
-st.title("📊 Análisis de Modulación por Periodos")
+st.title("ADH MODULACIÓN CD EA")
 
 uploaded_file = st.file_uploader("Sube tu archivo Excel", type=['xlsx'])
 
@@ -38,10 +38,10 @@ if uploaded_file is not None:
         df_base['es_modulado'] = df_base['BUSCA'].apply(es_valido)
 
         # --- SECCIÓN 1: GRÁFICO DE MODULACIÓN ---
-        st.markdown("### 📈 Evolución de Modulación")
+        st.markdown("### Evolución de Modulación")
         opcion_graf = st.selectbox(
             "Selecciona el periodo para el gráfico:",
-            ["Últimos 7 días", "Mes Actual (Calendario)", "Promedio Mensual (Histórico)"]
+            ["Últimos 7 días", "Mes Actual", "Histórico"]
         )
 
         ultima_fecha = df_base['Entrega'].max()
@@ -49,7 +49,7 @@ if uploaded_file is not None:
         if opcion_graf == "Últimos 7 días":
             df_g = df_base[df_base['Fecha'] > (ultima_fecha - pd.Timedelta(days=7)).date()]
             agrupar = 'Fecha'
-        elif opcion_graf == "Mes Actual (Calendario)":
+        elif opcion_graf == "Mes Actual":
             df_g = df_base[(df_base['Entrega'].dt.month == ultima_fecha.month) & 
                            (df_base['Entrega'].dt.year == ultima_fecha.year)]
             agrupar = 'Fecha'
@@ -72,8 +72,8 @@ if uploaded_file is not None:
 
         # --- SECCIÓN 2: CLIENTES ---
         st.markdown("---")
-        st.header("Clientes")
-        st.subheader("Clientes No Modulados")
+        st.header("DIARIO")
+        st.subheader("NO MODULACIÓN")
         
         # Filtramos los NO modulados
         df_no_modulados = df_base[df_base['es_modulado'] == False].copy()

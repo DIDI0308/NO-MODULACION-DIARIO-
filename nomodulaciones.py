@@ -46,11 +46,11 @@ if uploaded_file is not None:
             agrupar_por = 'Fecha'
             
         elif opcion == "Mes Actual (Calendario)":
-            # FILTRO ESTRICTO: Solo filas del mismo mes y año que la última fecha
-            df_final = df_base[
-                (df_base['Entrega'].dt.month == ultima_fecha.month) & 
-                (df_base['Entrega'].dt.year == ultima_fecha.year)
-            ]
+            # Filtra estrictamente desde el día 1 del mes de la última fecha registrada
+            mes_actual = ultima_fecha.month
+            anio_actual = ultima_fecha.year
+            df_final = df_base[(df_base['Entrega'].dt.month == mes_actual) & 
+                               (df_base['Entrega'].dt.year == anio_actual)]
             agrupar_por = 'Fecha'
             
         else: # Promedio Mensual

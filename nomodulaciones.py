@@ -1,10 +1,9 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 
-st.set_page_config(page_title="Contador 3.30.8", layout="centered")
+st.set_page_config(page_title="Resumen por Fecha 3.30.8", layout="centered")
 
-st.title("📂 Cargador de Base de Datos")
+st.title("📂 Resumen de Datos por Fecha")
 
 uploaded_file = st.file_uploader("Sube tu archivo Excel", type=['xlsx'])
 
@@ -13,34 +12,18 @@ if uploaded_file is not None:
         # 1. Cargar la hoja específica
         df = pd.read_excel(uploaded_file, sheet_name="3.30.8")
 
-        # --- PROCESAMIENTO ---
-        # Convertir 'Entrega' a fecha y quitar filas inválidas
+        # --- PROCESAMIENTO INICIAL ---
+        # Limpieza de fechas
         df['Entrega'] = pd.to_datetime(df['Entrega'], errors='coerce')
         df = df.dropna(subset=['Entrega'])
-        df['Fecha_Corta'] = df['Entrega'].dt.date
-        
-        # --- FILTRO DE FECHA (Debajo del título) ---
-        lista_fechas = sorted(df['Fecha_Corta'].unique(), reverse=True)
-        
-        fecha_elegida = st.selectbox(
-            "Selecciona la fecha de Entrega:",
-            options=lista_fechas,
-            format_func=lambda x: x.strftime('%d/%m/%Y')
-        )
+        df['Fecha'] = df['Entrega'].dt.date
 
-        # --- LÓGICA DE FILTRADO BASE (Fecha y DPS 88) ---
-        df_base = df[
-            (df['Fecha_Corta'] == fecha_elegida) & 
-            (df['DPS'].astype(str).str.contains('88'))
-        ]
+        # Filtro base: Solo DPS 88
+        df_base = df[df['DPS'].astype(str).str.contains('88')].copy()
 
-        # 1. Conteo Concatenados (Total del filtro base)
-        conteo_total_concatenado = df_base['CONCATENADO'].nunique()
-
-        # 2. Conteo Modulados (BUSCA con número válido y no error)
-        # Filtramos valores no numéricos, nulos o errores comunes de Excel
+        # Función para validar si la columna BUSCA tiene un número válido
         def es_valido(valor):
-            if pd.isna(valor) or valor == "" or "error" in str(valor).lower() or "#" in str(valor):
+            if pd.isna(valor) or valor == "" or "#" in str(valor):
                 return False
             try:
                 float(str(valor).replace(',', '.'))
@@ -48,24 +31,40 @@ if uploaded_file is not None:
             except ValueError:
                 return False
 
-        # Aplicamos la máscara de validez sobre el filtro base
-        mask_busca_valido = df_base['BUSCA'].apply(es_valido)
-        df_modulados = df_base[mask_busca_valido]
-        
-        conteo_modulados = df_modulados['CONCATENADO'].nunique()
+        # Identificar filas moduladas (BUSCA válido)
+        df_base['Es_Modulado'] = df_base['BUSCA'].apply(es_valido)
+
+        # --- CREACIÓN DE LA TABLA RESUMEN ---
+        # Agrupamos por fecha y calculamos los dos datos solicitados
+        resumen = df_base.groupby('Fecha').apply(lambda x: pd.Series({
+            'Total Concatenados': x['CONCATENADO'].nunique(),
+            'Modulados': x[x['Es_Modulado'] == True]['CONCATENADO'].nunique()
+        })).reset_index()
+
+        # Ordenar por fecha más reciente
+        resumen = resumen.sort_values(by='Fecha', ascending=False)
 
         # --- VISUALIZACIÓN ---
         st.markdown("---")
+        st.subheader("📊 Tabla Comparativa por Fecha (DPS 88)")
         
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.metric(label="Total Concatenados", value=conteo_total_concatenado)
-            
-        with col2:
-            st.metric(label="Modulados", value=conteo_modulados)
-            
-        st.caption(f"Filtros aplicados: Hoja 3.30.8 | Fecha: {fecha_elegida.strftime('%d/%m/%Y')} | DPS: 88")
+        # Mostramos la tabla formateada
+        st.dataframe(
+            resumen, 
+            column_config={
+                "Fecha": st.column_config.DateColumn("Fecha de Entrega", format="DD/MM/YYYY"),
+                "Total Concatenados": st.column_config.NumberColumn("Total Concatenados"),
+                "Modulados": st.column_config.NumberColumn("Modulados")
+            },
+            hide_index=True,
+            use_container_width=True
+        )
+
+        # Totales generales de la tabla
+        st.markdown("---")
+        c1, c2 = st.columns(2)
+        c1.metric("Total General Concatenados", int(resumen['Total Concatenados'].sum()))
+        c2.metric("Total General Modulados", int(resumen['Modulados'].sum()))
 
     except Exception as e:
-        st.error(f"Error: Revisa que el archivo tenga las columnas 'Entrega', 'DPS', 'CONCATENADO' y 'BUSCA'.")
+        st.error(f"Error: Asegúrate de que la hoja 3.30.8 tenga las columnas 'Entrega', 'DPS', 'CONCATENADO' y 'BUSCA'.")

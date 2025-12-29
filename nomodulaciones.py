@@ -2,9 +2,10 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-st.set_page_config(page_title="Dashboard Modulación 3.30.8", layout="wide")
+# Configuración de página
+st.set_page_config(page_title="Dashboard Modulación & Errores", layout="wide")
 
-st.title("📊 Control de Modulación y Errores")
+st.title("📊 Análisis de Modulación y Reporte de Errores")
 
 uploaded_file = st.file_uploader("Sube tu archivo Excel", type=['xlsx'])
 
@@ -13,7 +14,7 @@ if uploaded_file is not None:
         # 1. Cargar datos
         df = pd.read_excel(uploaded_file, sheet_name="3.30.8")
 
-        # --- PROCESAMIENTO GENERAL ---
+        # --- PROCESAMIENTO BASE ---
         df['Entrega'] = pd.to_datetime(df['Entrega'], errors='coerce')
         df = df.dropna(subset=['Entrega'])
         df['Fecha'] = df['Entrega'].dt.date
@@ -30,27 +31,24 @@ if uploaded_file is not None:
             except ValueError:
                 return False
 
-        # Identificar qué es válido y qué es error
         df_base['es_modulado'] = df_base['BUSCA'].apply(es_valido)
 
-        # ==========================================
-        # SECCIÓN 1: GRÁFICO DE PORCENTAJE (OCULTO LA TABLA)
-        # ==========================================
-        st.header("1. Evolución de Modulación")
-        opcion_periodo = st.selectbox(
+        # --- SECCIÓN 1: GRÁFICO DE MODULACIÓN ---
+        st.markdown("### 📈 Evolución de Modulación")
+        opcion_grafico = st.selectbox(
             "Selecciona el periodo para el gráfico:",
             ["Últimos 7 días", "Mes Actual (Calendario)", "Promedio Mensual (Histórico)"]
         )
 
         ultima_fecha = df_base['Entrega'].max()
         
-        if opcion_periodo == "Últimos 7 días":
+        if opcion_grafico == "Últimos 7 días":
             fecha_limite = (ultima_fecha - pd.Timedelta(days=7)).date()
             df_graf = df_base[df_base['Fecha'] > fecha_limite]
             agrupar_por = 'Fecha'
-        elif opcion_periodo == "Mes Actual (Calendario)":
+        elif opcion_grafico == "Mes Actual (Calendario)":
             df_graf = df_base[(df_base['Entrega'].dt.month == ultima_fecha.month) & 
-                               (df_base['Entrega'].dt.year == ultima_fecha.year)]
+                              (df_base['Entrega'].dt.year == ultima_fecha.year)]
             agrupar_por = 'Fecha'
         else:
             df_graf = df_base.copy()
@@ -63,44 +61,48 @@ if uploaded_file is not None:
                 'Modulados': x[x['es_modulado']]['CONCATENADO'].nunique()
             })
         ).reset_index()
+        resumen['% Modulación'] = (resumen['Modulados'] / resumen['Total']) * 100
 
-        resumen['Porcentaje'] = (resumen['Modulados'] / resumen['Total']) * 100
-        
-        fig = px.bar(resumen.sort_values(agrupar_por), x=agrupar_por, y='Porcentaje', 
-                     text='Porcentaje', color_discrete_sequence=['#FFD700'])
+        fig = px.bar(resumen.sort_values(agrupar_por), x=agrupar_por, y='% Modulación', 
+                     text='% Modulación', color_discrete_sequence=['#FFD700'])
         fig.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
-        fig.update_layout(yaxis_title="% Modulación", yaxis=dict(range=[0, 115]), xaxis={'type': 'category'})
+        fig.update_layout(yaxis=dict(range=[0, 115]), xaxis={'type': 'category'})
         st.plotly_chart(fig, use_container_width=True)
 
-
-        # ==========================================
-        # SECCIÓN 2: TABLA DE ERRORES (DETALLE POR FECHA)
-        # ==========================================
+        # --- SECCIÓN 2: TABLA DE ERRORES (BUSCA CON ERROR) ---
         st.markdown("---")
-        st.header("2. Detalle de Registros con Error")
+        st.markdown("### ⚠️ Reporte de Registros con Error")
         
-        # Filtro visual de fecha única para la tabla de errores
-        fechas_disponibles = sorted(df_base['Fecha'].unique(), reverse=True)
-        fecha_error_sel = st.selectbox("Selecciona fecha para ver Errores:", fechas_disponibles)
+        # Filtro 1: Solo los que tienen error en BUSCA (usamos la inversa de es_valido)
+        df_errores = df_base[df_base['es_modulado'] == False].copy()
 
-        # 1. Filtrar por la fecha seleccionada
-        # 2. Filtrar solo los que NO son modulados (errores en BUSCA)
-        df_errores = df_base[(df_base['Fecha'] == fecha_error_sel) & (~df_base['es_modulado'])].copy()
+        # Filtro 2: Selector visual de una fecha específica
+        fechas_disponibles = sorted(df_errores['Fecha'].unique(), reverse=True)
+        fecha_filtro = st.selectbox("Elige una fecha para ver los errores:", fechas_disponibles)
 
-        if df_errores.empty:
-            st.success(f"No se encontraron errores para la fecha {fecha_error_sel}")
+        # Aplicar filtro de fecha
+        df_error_fecha = df_errores[df_errores['Fecha'] == fecha_filtro]
+
+        # Lógica: Sin repetidos según 'Client', solo el primero
+        # Seleccionamos solo las columnas pedidas
+        columnas_pedidas = ['Client', 'F.Pedido', 'Motivo']
+        
+        # Verificamos que las columnas existan antes de filtrar
+        columnas_existentes = [c for c in columnas_pedidas if c in df_error_fecha.columns]
+        
+        if not df_error_fecha.empty:
+            # Eliminamos duplicados por 'Client' manteniendo la primera aparición
+            resultado_errores = df_error_fecha.drop_duplicates(subset=['Client'], keep='first')
+            
+            # Mostramos la tabla solo con las columnas deseadas
+            st.write(f"Mostrando {len(resultado_errores)} clientes únicos con error para el {fecha_filtro}:")
+            st.dataframe(resultado_errores[columnas_existentes], use_container_width=True, hide_index=True)
+            
+            # Botón de descarga para este reporte específico
+            csv = resultado_errores[columnas_existentes].to_csv(index=False).encode('utf-8')
+            st.download_button("📥 Descargar Errores (CSV)", csv, f"errores_{fecha_filtro}.csv", "text/csv")
         else:
-            # Eliminar duplicados por la columna 'Client', dejando solo el primero
-            # Seleccionar solo las columnas solicitadas
-            df_errores_final = df_errores.drop_duplicates(subset=['Client'], keep='first')
-            
-            columnas_finales = ['Client', 'F.Pedido', 'Motivo']
-            
-            # Verificar que las columnas existan antes de mostrar
-            columnas_existentes = [col for col in columnas_finales if col in df_errores_final.columns]
-            
-            st.write(f"Mostrando motivos de error para {len(df_errores_final)} clientes únicos:")
-            st.dataframe(df_errores_final[columnas_existentes], use_container_width=True, hide_index=True)
+            st.success(f"No se encontraron errores para la fecha {fecha_filtro}.")
 
     except Exception as e:
-        st.error(f"Error al procesar el archivo: {e}")
+        st.error(f"Error en el procesamiento: {e}")

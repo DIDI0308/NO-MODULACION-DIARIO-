@@ -7,9 +7,7 @@ st.set_page_config(page_title="Dashboard Modulación 3.30.8", layout="wide")
 
 st.title("📊 Análisis de Modulación por Periodos")
 
-# Nota: Recuerda que para que funcione en la nube, tu archivo requirements.txt debe tener:
-# pandas, openpyxl, plotly, streamlit
-
+# Nota: Asegúrate de tener el archivo requirements.txt con: pandas, openpyxl, plotly, streamlit
 uploaded_file = st.file_uploader("Sube tu archivo Excel", type=['xlsx'])
 
 if uploaded_file is not None:
@@ -62,7 +60,7 @@ if uploaded_file is not None:
             df_final['Periodo'] = df_base['Entrega'].dt.to_period('M').astype(str)
             agrupar_por = 'Periodo'
 
-        # --- GENERACIÓN DE TABLA ---
+        # --- CÁLCULOS INTERNOS (La tabla se genera pero no se muestra) ---
         resumen = df_final.groupby(agrupar_por).apply(
             lambda x: pd.Series({
                 'Total Concatenados': x['CONCATENADO'].nunique(),
@@ -72,34 +70,12 @@ if uploaded_file is not None:
 
         resumen['% Modulación'] = (resumen['Modulados'] / resumen['Total Concatenados']) * 100
         
-        # Ordenamos para la tabla (descendente) y para el gráfico (ascendente)
-        resumen_tabla = resumen.sort_values(by=agrupar_por, ascending=False)
+        # Ordenar cronológicamente para el gráfico
         resumen_grafico = resumen.sort_values(by=agrupar_por, ascending=True)
-
-        # --- VISUALIZACIÓN DE TABLA ---
-        st.markdown("---")
-        st.subheader(f"Vista de Datos: {opcion}")
-        
-        formatos = {
-            'Total Concatenados': '{:,.0f}',
-            'Modulados': '{:,.0f}',
-            '% Modulación': '{:.2f}%'
-        }
-        
-        # Ajuste de formato de fecha para la tabla
-        df_mostrar = resumen_tabla.copy()
-        if agrupar_por == 'Fecha':
-            df_mostrar['Fecha'] = df_mostrar['Fecha'].apply(lambda x: x.strftime('%d/%m/%Y'))
-
-        st.dataframe(
-            df_mostrar.style.format(formatos), 
-            use_container_width=True,
-            hide_index=True
-        )
 
         # --- VISUALIZACIÓN DE GRÁFICO ---
         st.markdown("---")
-        st.subheader(f"Gráfico de % Modulación")
+        st.subheader(f"Evolución de % Modulación: {opcion}")
 
         fig = px.bar(
             resumen_grafico,
@@ -107,7 +83,7 @@ if uploaded_file is not None:
             y='% Modulación',
             text='% Modulación',
             color_discrete_sequence=['#FFD700'], # Color Amarillo
-            title=f"Evolución de Modulación: {opcion}"
+            hover_data=['Total Concatenados', 'Modulados'] # Datos extra al pasar el mouse
         )
 
         # Configuración de etiquetas del gráfico
@@ -119,11 +95,13 @@ if uploaded_file is not None:
         fig.update_layout(
             yaxis_title="% Modulación",
             xaxis_title="Día / Periodo",
-            yaxis=dict(range=[0, 110]), # Rango hasta 110 para que quepa la etiqueta
-            xaxis={'type': 'category'} # Trata fechas como categorías para evitar huecos
+            yaxis=dict(range=[0, 115]), # Rango extendido para que no se corten las etiquetas
+            xaxis={'type': 'category'}, # Evita espacios vacíos en fechas
+            height=600 # Altura del gráfico para mejor visibilidad
         )
 
         st.plotly_chart(fig, use_container_width=True)
 
     except Exception as e:
         st.error(f"Error al procesar el archivo: {e}")
+        

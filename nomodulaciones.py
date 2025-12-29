@@ -5,7 +5,7 @@ import plotly.express as px
 # Configuración de página
 st.set_page_config(page_title="Dashboard Modulación & Errores", layout="wide")
 
-st.title("📊 Análisis de Modulación y Reporte de Errores")
+st.title("Análisis de Modulación y Reporte de Errores")
 
 uploaded_file = st.file_uploader("Sube tu archivo Excel", type=['xlsx'])
 
@@ -14,7 +14,8 @@ if uploaded_file is not None:
         # 1. Cargar datos (Hoja específica)
         df = pd.read_excel(uploaded_file, sheet_name="3.30.8")
         
-        # LIMPIEZA CRÍTICA: Elimina espacios en blanco al inicio o final de los nombres de columnas
+        # --- LIMPIEZA TOTAL DE COLUMNAS ---
+        # Quitamos espacios al inicio/final y aseguramos que "Motivo" se llame exactamente así
         df.columns = df.columns.str.strip()
 
         # --- PROCESAMIENTO BASE ---
@@ -37,74 +38,70 @@ if uploaded_file is not None:
 
         df_base['es_modulado'] = df_base['BUSCA'].apply(es_valido)
 
-        # --- SECCIÓN 1: GRÁFICO DE MODULACIÓN ---
+        # --- SECCIÓN 1: GRÁFICO DE MODULACIÓN (TABLA OCULTA) ---
         st.markdown("### 📈 Evolución de Modulación")
-        opcion_grafico = st.selectbox(
-            "Selecciona el periodo para el gráfico:",
-            ["Últimos 7 días", "Mes Actual (Calendario)", "Promedio Mensual (Histórico)"]
-        )
+        opcion_graf = st.selectbox("Selecciona periodo:", ["Últimos 7 días", "Mes Actual (Calendario)", "Promedio Mensual (Histórico)"])
 
         ultima_fecha = df_base['Entrega'].max()
-        
-        if opcion_grafico == "Últimos 7 días":
-            fecha_limite = (ultima_fecha - pd.Timedelta(days=7)).date()
-            df_graf = df_base[df_base['Fecha'] > fecha_limite]
-            agrupar_por = 'Fecha'
-        elif opcion_grafico == "Mes Actual (Calendario)":
-            df_graf = df_base[(df_base['Entrega'].dt.month == ultima_fecha.month) & 
-                              (df_base['Entrega'].dt.year == ultima_fecha.year)]
-            agrupar_por = 'Fecha'
+        if opcion_graf == "Últimos 7 días":
+            df_g = df_base[df_base['Fecha'] > (ultima_fecha - pd.Timedelta(days=7)).date()]
+            agrupar = 'Fecha'
+        elif opcion_graf == "Mes Actual (Calendario)":
+            df_g = df_base[(df_base['Entrega'].dt.month == ultima_fecha.month) & (df_base['Entrega'].dt.year == ultima_fecha.year)]
+            agrupar = 'Fecha'
         else:
-            df_graf = df_base.copy()
-            df_graf['Periodo'] = df_base['Entrega'].dt.to_period('M').astype(str)
-            agrupar_por = 'Periodo'
+            df_g = df_base.copy()
+            df_g['Periodo'] = df_base['Entrega'].dt.to_period('M').astype(str)
+            agrupar = 'Periodo'
 
-        resumen = df_graf.groupby(agrupar_por).apply(
-            lambda x: pd.Series({
-                'Total': x['CONCATENADO'].nunique(),
-                'Modulados': x[x['es_modulado']]['CONCATENADO'].nunique()
-            })
-        ).reset_index()
+        resumen = df_g.groupby(agrupar).apply(lambda x: pd.Series({
+            'Total': x['CONCATENADO'].nunique(),
+            'Modulados': x[x['es_modulado']]['CONCATENADO'].nunique()
+        })).reset_index()
         resumen['% Modulación'] = (resumen['Modulados'] / resumen['Total']) * 100
 
-        fig = px.bar(resumen.sort_values(agrupar_por), x=agrupar_por, y='% Modulación', 
-                     text='% Modulación', color_discrete_sequence=['#FFD700'])
+        fig = px.bar(resumen.sort_values(agrupar), x=agrupar, y='% Modulación', text='% Modulación', color_discrete_sequence=['#FFD700'])
         fig.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
         fig.update_layout(yaxis=dict(range=[0, 115]), xaxis={'type': 'category'})
         st.plotly_chart(fig, use_container_width=True)
 
-        # --- SECCIÓN 2: TABLA DE ERRORES ---
+        # --- SECCIÓN 2: TABLA DE ERRORES CON COLUMNA MOTIVO ---
         st.markdown("---")
-        st.markdown("### ⚠️ Reporte de Registros con Error (BUSCA No Válido)")
+        st.markdown("### ⚠️ Reporte de Registros con Error")
         
-        # Filtramos solo los que NO son modulados (Errores en BUSCA)
+        # Filtramos Errores (BUSCA no válido)
         df_errores = df_base[df_base['es_modulado'] == False].copy()
 
         if not df_errores.empty:
             fechas_disponibles = sorted(df_errores['Fecha'].unique(), reverse=True)
-            fecha_filtro = st.selectbox("Elige una fecha para ver los errores detallados:", fechas_disponibles)
+            fecha_filtro = st.selectbox("Elige una fecha para ver los errores:", fechas_disponibles)
 
-            df_error_fecha = df_errores[df_errores['Fecha'] == fecha_filtro].copy()
+            # Filtro por fecha
+            df_final_err = df_errores[df_errores['Fecha'] == fecha_filtro].copy()
 
-            # Definimos las columnas exactas (ya limpias de espacios)
-            col_client = "Client"
-            col_pedido = "F.Pedido"
-            col_motivo = "Motivo"
+            # Aseguramos que la columna 'Motivo' sea tratada como texto y no se oculte
+            if 'Motivo' in df_final_err.columns:
+                df_final_err['Motivo'] = df_final_err['Motivo'].astype(str).replace(['nan', 'None', ''], 'Sin Motivo especificado')
+            else:
+                # Si por alguna razón la columna no se mapeó, la creamos vacía para no romper el código
+                df_final_err['Motivo'] = "Columna no encontrada"
+
+            # REGLA: Sin repetidos por 'Client', solo el primero
+            resultado_tabla = df_final_err.drop_duplicates(subset=['Client'], keep='first')
+
+            # Columnas a mostrar (Estrictamente estas tres)
+            columnas_visibles = ['Client', 'F.Pedido', 'Motivo']
             
-            # Asegurar que Motivo se trate como texto para mostrar los datos correctamente
-            if col_motivo in df_error_fecha.columns:
-                df_error_fecha[col_motivo] = df_error_fecha[col_motivo].astype(str).replace('nan', 'Sin Motivo')
+            # Filtramos solo las que existen para seguridad
+            cols_finales = [c for c in columnas_visibles if c in resultado_tabla.columns]
+
+            st.write(f"Mostrando **{len(resultado_tabla)}** clientes únicos con error para el día **{fecha_filtro}**")
             
-            # Sin repetidos según 'Client', manteniendo solo el primero
-            resultado_final = df_error_fecha.drop_duplicates(subset=[col_client], keep='first')
-
-            # Seleccionar solo las columnas solicitadas que existan en el archivo
-            columnas_finales = [c for c in [col_client, col_pedido, col_motivo] if c in resultado_final.columns]
-
-            st.write(f"Mostrando **{len(resultado_final)}** casos únicos de error para el día seleccionado.")
-            st.dataframe(resultado_final[columnas_finales], use_container_width=True, hide_index=True)
+            # MOSTRAR TABLA
+            st.dataframe(resultado_tabla[cols_finales], use_container_width=True, hide_index=True)
+            
         else:
-            st.success("No se detectaron errores de búsqueda.")
+            st.success("No se encontraron errores en la columna BUSCA.")
 
     except Exception as e:
-        st.error(f"Error en el procesamiento: {e}")
+        st.error(f"Error crítico: {e}")

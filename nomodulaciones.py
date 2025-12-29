@@ -34,23 +34,23 @@ if uploaded_file is not None:
         # --- FILTROS DE TIEMPO ---
         opcion = st.selectbox(
             "Selecciona el periodo de análisis:",
-            ["Últimos 7 días", "Último Mes Calendario", "Promedio Mensual (Histórico)"]
+            ["Últimos 7 días", "Mes Actual (Calendario)", "Promedio Mensual (Histórico)"]
         )
 
-        # Referencia de tiempo basada en el archivo
+        # Fecha de referencia (la más reciente en el archivo)
         ultima_fecha = df_base['Entrega'].max()
         
         if opcion == "Últimos 7 días":
-            fecha_limite = ultima_fecha - pd.Timedelta(days=7)
-            df_final = df_base[df_base['Entrega'] > fecha_limite]
+            fecha_limite = (ultima_fecha - pd.Timedelta(days=7)).date()
+            df_final = df_base[df_base['Fecha'] > fecha_limite]
             agrupar_por = 'Fecha'
             
-        elif opcion == "Último Mes Calendario":
-            # Filtra solo los días que pertenecen al mismo mes y año de la última fecha
-            df_final = df_base[
-                (df_base['Entrega'].dt.month == ultima_fecha.month) & 
-                (df_base['Entrega'].dt.year == ultima_fecha.year)
-            ]
+        elif opcion == "Mes Actual (Calendario)":
+            # Filtra solo los días que pertenecen al mismo Mes y Año de la última fecha
+            mes_actual = ultima_fecha.month
+            anio_actual = ultima_fecha.year
+            df_final = df_base[(df_base['Entrega'].dt.month == mes_actual) & 
+                               (df_base['Entrega'].dt.year == anio_actual)]
             agrupar_por = 'Fecha'
             
         else: # Promedio Mensual
@@ -71,6 +71,8 @@ if uploaded_file is not None:
 
         # --- VISUALIZACIÓN ---
         st.markdown("---")
+        nombre_mes = ultima_fecha.strftime('%B %Y') if opcion == "Mes Actual (Calendario)" else opcion
+        st.subheader(f"Vista: {nombre_mes}")
         
         formatos = {
             'Total Concatenados': '{:,.0f}',
@@ -90,4 +92,4 @@ if uploaded_file is not None:
         )
 
     except Exception as e:
-        st.error(f"Error: Asegúrate de que el archivo tenga las columnas requeridas.")
+        st.error(f"Error al procesar el archivo. Asegúrate de que las columnas sean correctas.")

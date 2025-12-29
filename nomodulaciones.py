@@ -6,6 +6,7 @@ st.set_page_config(page_title="Dashboard Modulación 3.30.8", layout="wide")
 
 st.title("📊 Análisis de Modulación por Periodos")
 
+# Recordatorio: Asegúrate de tener 'plotly' en tu archivo requirements.txt
 uploaded_file = st.file_uploader("Sube tu archivo Excel", type=['xlsx'])
 
 if uploaded_file is not None:
@@ -30,6 +31,7 @@ if uploaded_file is not None:
             except ValueError:
                 return False
 
+        # Identificar filas moduladas (BUSCA válido)
         df_base['es_modulado'] = df_base['BUSCA'].apply(es_valido)
 
         # --- FILTROS DE TIEMPO ---
@@ -57,48 +59,57 @@ if uploaded_file is not None:
             df_final['Periodo'] = df_base['Entrega'].dt.to_period('M').astype(str)
             agrupar_por = 'Periodo'
 
-        # --- GENERACIÓN DE DATOS PARA EL GRÁFICO ---
+        # --- CÁLCULO DE MÉTRICAS PARA EL GRÁFICO ---
+        # 1. Total de concatenados únicos por fecha/periodo
+        # 2. Modulados únicos por fecha/periodo
         resumen_df = df_final.groupby(agrupar_por).apply(
             lambda x: pd.Series({
                 'Modulados': x[x['es_modulado']]['CONCATENADO'].nunique(),
-                'No Modulados': x[~x['es_modulado']]['CONCATENADO'].nunique()
+                'Total': x['CONCATENADO'].nunique()
             })
         ).reset_index()
 
-        # Convertir a formato largo para Plotly (Melt)
-        df_plot = resumen_df.melt(id_vars=[agrupar_por], value_vars=['Modulados', 'No Modulados'], 
-                                   var_name='Estado', value_name='Cantidad')
+        # Calcular el 'No Modulado' como la diferencia para que sumen el 100% del Total
+        resumen_df['No Modulados'] = resumen_df['Total'] - resumen_df['Modulados']
+
+        # Convertir a formato largo para el gráfico apilado
+        df_plot = resumen_df.melt(
+            id_vars=[agrupar_por, 'Total'], 
+            value_vars=['Modulados', 'No Modulados'], 
+            var_name='Estado', 
+            value_name='Cantidad'
+        )
 
         # --- GRÁFICO ---
         st.markdown("---")
         
-        # Paleta de amarillos
-        colores_amarillos = ['#FFD700', '#FFFACD'] # Oro para Modulados, Amarillo claro para No Modulados
+        # Paleta de amarillos: Amarillo Intenso para Modulados, Crema para el resto
+        colores_amarillos = {'Modulados': '#FFD700', 'No Modulados': '#FFF9C4'}
 
         fig = px.bar(
             df_plot,
             x=agrupar_por,
             y='Cantidad',
             color='Estado',
-            title=f"Distribución de Modulación: {opcion}",
-            color_discrete_sequence=colores_amarillos,
-            barmode='relative', # Esto permite el apilado
-            text='Cantidad'
+            title=f"Cumplimiento de Modulación (Base: Total Concatenados Únicos)",
+            color_discrete_map=colores_amarillos,
+            text='Cantidad' 
         )
 
-        # Configuración para que sea 100% apilado
+        # Forzar el apilado al 100%
         fig.update_layout(barnorm='percent')
         
-        # Etiquetas de datos en porcentaje
-        fig.update_traces(texttemplate='%{y:.1f}%', textposition='inside')
+        # Etiquetas internas con el % de cada segmento
+        fig.update_traces(
+            texttemplate='%{y:.1f}%', 
+            textposition='inside'
+        )
         
-        # Mejorar estética de ejes
         fig.update_layout(
             yaxis_title="Porcentaje (%)",
-            xaxis_title="Fecha / Periodo",
-            legend_title="Estado",
-            uniformtext_minsize=8, 
-            uniformtext_mode='hide'
+            xaxis_title="Periodo",
+            legend_title="Leyenda",
+            xaxis={'type': 'category'}
         )
 
         st.plotly_chart(fig, use_container_width=True)

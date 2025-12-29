@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import matplotlib.colors as mcolors
 
 st.set_page_config(page_title="Dashboard Modulación 3.30.8", layout="wide")
 
@@ -39,7 +38,6 @@ if uploaded_file is not None:
             ["Últimos 7 días", "Mes Actual (Calendario)", "Promedio Mensual (Histórico)"]
         )
 
-        # Fecha de referencia (la más reciente en el archivo)
         ultima_fecha = df_base['Entrega'].max()
         
         if opcion == "Últimos 7 días":
@@ -56,60 +54,54 @@ if uploaded_file is not None:
             
         else: # Promedio Mensual
             df_final = df_base.copy()
-            df_final['Periodo'] = df_base['Entrega'].dt.to_period('M')
+            df_final['Periodo'] = df_base['Entrega'].dt.to_period('M').astype(str)
             agrupar_por = 'Periodo'
 
         # --- GENERACIÓN DE DATOS PARA EL GRÁFICO ---
         resumen_df = df_final.groupby(agrupar_por).apply(
             lambda x: pd.Series({
-                'Total Concatenados': x['CONCATENADO'].nunique(),
-                'Modulados': x[x['es_modulado']]['CONCATENADO'].nunique()
+                'Modulados': x[x['es_modulado']]['CONCATENADO'].nunique(),
+                'No Modulados': x[~x['es_modulado']]['CONCATENADO'].nunique()
             })
         ).reset_index()
 
-        # Evitar división por cero
-        resumen_df['No Modulados'] = resumen_df['Total Concatenados'] - resumen_df['Modulados']
-        resumen_df['% Modulación'] = (resumen_df['Modulados'] / resumen_df['Total Concatenados']) * 100
-        resumen_df['% No Modulación'] = (resumen_df['No Modulados'] / resumen_df['Total Concatenados']) * 100
+        # Convertir a formato largo para Plotly (Melt)
+        df_plot = resumen_df.melt(id_vars=[agrupar_por], value_vars=['Modulados', 'No Modulados'], 
+                                   var_name='Estado', value_name='Cantidad')
 
-        # Ordenar por fecha o periodo
-        resumen_df = resumen_df.sort_values(by=agrupar_por, ascending=True)
-
-        # Preparar los datos para el gráfico apilado
-        # Melting the DataFrame to get a 'value' column for stacking
-        df_melted = resumen_df.melt(id_vars=[agrupar_por], value_vars=['% Modulación', '% No Modulación'], 
-                                    var_name='Tipo de Modulación', value_name='Porcentaje')
-
-        # --- VISUALIZACIÓN ---
+        # --- GRÁFICO ---
         st.markdown("---")
-        st.subheader(f"Gráfico de Modulación: {opcion}")
         
-        # Paleta de colores amarillos (ejemplo de amarillos a naranjas)
-        # Puedes ajustar los colores HEX si tienes unos específicos
-        yellow_palette = ["#FFFF00", "#FFD700", "#FFA500", "#FF8C00"]
-        
-        # Crear el gráfico de barras apiladas al 100%
+        # Paleta de amarillos
+        colores_amarillos = ['#FFD700', '#FFFACD'] # Oro para Modulados, Amarillo claro para No Modulados
+
         fig = px.bar(
-            df_melted,
+            df_plot,
             x=agrupar_por,
-            y='Porcentaje',
-            color='Tipo de Modulación',
-            text_auto='.2s',  # Formato automático de texto, 2 decimales
-            title=f'Porcentaje de Modulación vs No Modulación por {agrupar_por}',
-            labels={'Porcentaje': 'Porcentaje (%)', agrupar_por: 'Periodo'},
-            color_discrete_sequence=yellow_palette, # Aplica la paleta amarilla
-            height=500
+            y='Cantidad',
+            color='Estado',
+            title=f"Distribución de Modulación: {opcion}",
+            color_discrete_sequence=colores_amarillos,
+            barmode='relative', # Esto permite el apilado
+            text='Cantidad'
         )
 
-        # Ajustar el texto de las etiquetas para que sean %
-        fig.update_traces(texttemplate='%{y:.2f}%', textposition='inside')
-        fig.update_layout(uniformtext_minsize=8, uniformtext_mode='hide')
-
-        # Asegurarse de que el eje Y vaya de 0 a 100
-        fig.update_yaxes(range=[0, 100])
+        # Configuración para que sea 100% apilado
+        fig.update_layout(barnorm='percent')
+        
+        # Etiquetas de datos en porcentaje
+        fig.update_traces(texttemplate='%{y:.1f}%', textposition='inside')
+        
+        # Mejorar estética de ejes
+        fig.update_layout(
+            yaxis_title="Porcentaje (%)",
+            xaxis_title="Fecha / Periodo",
+            legend_title="Estado",
+            uniformtext_minsize=8, 
+            uniformtext_mode='hide'
+        )
 
         st.plotly_chart(fig, use_container_width=True)
 
     except Exception as e:
-        st.error(f"Error al procesar el archivo o generar el gráfico. Verifica el formato de tus datos y la existencia de las columnas requeridas.")
-        st.exception(e) # Muestra el detalle del error para depuración
+        st.error(f"Error al procesar el archivo: {e}")

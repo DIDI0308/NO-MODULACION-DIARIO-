@@ -3,7 +3,7 @@ import pandas as pd
 import plotly.express as px
 
 # Configuración de página
-st.set_page_config(page_title="Dashboard Modulación & Errores", layout="wide")
+st.set_page_config(page_title="Dashboard Modulación & Clientes", layout="wide")
 
 st.title("📊 Análisis de Modulación por Periodos")
 
@@ -70,29 +70,29 @@ if uploaded_file is not None:
         fig.update_layout(yaxis=dict(range=[0, 115]), xaxis={'type': 'category'})
         st.plotly_chart(fig, use_container_width=True)
 
-        # --- SECCIÓN 2: CLIENTES NO MODULADOS ---
+        # --- SECCIÓN 2: CLIENTES ---
         st.markdown("---")
-        st.header("👥 Clientes")
+        st.header("Clientes")
         st.subheader("Clientes No Modulados")
         
-        # Filtramos Errores (BUSCA no válido)
-        df_errores = df_base[df_base['es_modulado'] == False].copy()
+        # Filtramos los que NO son modulados
+        df_no_modulados = df_base[df_base['es_modulado'] == False].copy()
 
-        if not df_errores.empty:
-            fechas_err = sorted(df_errores['Fecha'].unique(), reverse=True)
-            fecha_sel = st.selectbox("Filtrar por fecha específica:", fechas_err)
+        if not df_no_modulados.empty:
+            fechas_disponibles = sorted(df_no_modulados['Fecha'].unique(), reverse=True)
+            fecha_sel = st.selectbox("Filtrar por fecha específica:", fechas_disponibles)
 
             # Filtro por fecha seleccionada
-            df_err_fecha = df_errores[df_errores['Fecha'] == fecha_sel].copy()
+            df_seccion_clientes = df_no_modulados[df_no_modulados['Fecha'] == fecha_sel].copy()
 
             # Asegurar que la columna Motivo sea visible y de tipo texto
-            if 'Motivo' in df_err_fecha.columns:
-                df_err_fecha['Motivo'] = df_err_fecha['Motivo'].astype(str).replace(['nan', 'None'], 'Sin Motivo especificado')
+            if 'Motivo' in df_seccion_clientes.columns:
+                df_seccion_clientes['Motivo'] = df_seccion_clientes['Motivo'].astype(str).replace(['nan', 'None'], 'Sin Motivo especificado')
             else:
-                df_err_fecha['Motivo'] = "Columna no encontrada"
+                df_seccion_clientes['Motivo'] = "Columna no encontrada"
 
             # Sin repetidos según 'Client', manteniendo solo el primero
-            resultado_tabla = df_err_fecha.drop_duplicates(subset=['Client'], keep='first')
+            resultado_tabla = df_seccion_clientes.drop_duplicates(subset=['Client'], keep='first')
 
             # Columnas estrictamente solicitadas
             columnas_finales = ['Client', 'F.Pedido', 'Motivo']
@@ -100,11 +100,11 @@ if uploaded_file is not None:
             # Verificación final de existencia de columnas para la tabla
             cols_ok = [c for c in columnas_finales if c in resultado_tabla.columns]
 
-            st.write(f"Se encontraron **{len(resultado_tabla)}** clientes únicos con error para el día **{fecha_sel}**")
+            st.write(f"Se encontraron **{len(resultado_tabla)}** registros únicos para el día **{fecha_sel}**")
             st.dataframe(resultado_tabla[cols_ok], use_container_width=True, hide_index=True)
             
         else:
-            st.success("No se detectaron clientes con errores en el periodo seleccionado.")
+            st.success("No se detectaron clientes no modulados en el periodo seleccionado.")
 
     except Exception as e:
         st.error(f"Error en el procesamiento: {e}")

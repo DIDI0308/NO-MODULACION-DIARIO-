@@ -7,7 +7,7 @@ st.set_page_config(page_title="Dashboard Modulación 3.30.8", layout="wide")
 
 st.title("📊 Análisis de Modulación por Periodos")
 
-# Recordatorio: El archivo requirements.txt debe tener: pandas, openpyxl, plotly, streamlit
+# NOTA: Asegúrate de tener 'plotly' en tu archivo requirements.txt
 uploaded_file = st.file_uploader("Sube tu archivo Excel", type=['xlsx'])
 
 if uploaded_file is not None:
@@ -34,12 +34,13 @@ if uploaded_file is not None:
 
         df_base['es_modulado'] = df_base['BUSCA'].apply(es_valido)
 
-        # --- FILTROS DE TIEMPO (Selector principal) ---
+        # --- FILTROS DE TIEMPO ---
         opcion = st.selectbox(
             "Selecciona el periodo de análisis:",
             ["Últimos 7 días", "Mes Actual (Calendario)", "Promedio Mensual (Histórico)"]
         )
 
+        # Fecha de referencia (la más reciente en el archivo)
         ultima_fecha = df_base['Entrega'].max()
         
         if opcion == "Últimos 7 días":
@@ -56,6 +57,7 @@ if uploaded_file is not None:
             
         else: # Promedio Mensual
             df_final = df_base.copy()
+            # Convertimos a string para que el gráfico lo trate como etiquetas
             df_final['Periodo'] = df_base['Entrega'].dt.to_period('M').astype(str)
             agrupar_por = 'Periodo'
 
@@ -69,60 +71,38 @@ if uploaded_file is not None:
 
         resumen['% Modulación'] = (resumen['Modulados'] / resumen['Total Concatenados']) * 100
         
-        # Ordenar para que el gráfico fluya cronológicamente (de izquierda a derecha)
-        resumen_grafico = resumen.sort_values(by=agrupar_por, ascending=True)
+        # Ordenar cronológicamente (de más antiguo a más reciente para el gráfico)
+        resumen = resumen.sort_values(by=agrupar_por, ascending=True)
 
-        # --- VISUALIZACIÓN ---
+        # --- VISUALIZACIÓN DEL GRÁFICO ---
         st.markdown("---")
-        
-        # 1. Gráfico de Barras
-        st.subheader(f"Gráfico: % Modulación ({opcion})")
-        
+        st.subheader(f"Evolución de % Modulación: {opcion}")
+
+        # Creación del gráfico de barras
         fig = px.bar(
-            resumen_grafico,
+            resumen,
             x=agrupar_por,
             y='% Modulación',
-            color_discrete_sequence=['#FFD700'], # Color Amarillo
-            text='% Modulación'
+            text='% Modulación',
+            color_discrete_sequence=['#FFD700'], # Color amarillo
+            labels={'% Modulación': 'Porcentaje (%)', 'Fecha': 'Día de Entrega'}
         )
 
+        # Ajuste de etiquetas y formato
         fig.update_traces(
             texttemplate='%{y:.1f}%', 
             textposition='outside'
         )
-
+        
         fig.update_layout(
             yaxis_title="% Modulación",
-            xaxis_title="Día / Periodo",
-            yaxis=dict(range=[0, 115]), # Espacio para las etiquetas
-            xaxis={'type': 'category'}  # Evita huecos en fechas vacías
+            xaxis_title="Periodo / Fecha",
+            yaxis=dict(range=[0, 110]), # Rango hasta 110 para que quepa la etiqueta
+            xaxis={'type': 'category'} # Trata las fechas como categorías para evitar huecos
         )
 
+        # Mostrar gráfico
         st.plotly_chart(fig, use_container_width=True)
 
-        # 2. Tabla Detallada (debajo del gráfico)
-        st.markdown("---")
-        st.subheader("Datos Detallados")
-        
-        # Re-ordenar para la tabla (más reciente primero)
-        resumen_tabla = resumen.sort_values(by=agrupar_por, ascending=False)
-        
-        formatos = {
-            'Total Concatenados': '{:,.0f}',
-            'Modulados': '{:,.0f}',
-            '% Modulación': '{:.2f}%'
-        }
-        
-        if agrupar_por == 'Fecha':
-            formatos['Fecha'] = lambda x: x.strftime('%d/%m/%Y')
-        else:
-            formatos['Periodo'] = lambda x: str(x)
-
-        st.dataframe(
-            resumen_tabla.style.format(formatos), 
-            use_container_width=True,
-            hide_index=True
-        )
-
     except Exception as e:
-        st.error(f"Error al procesar el archivo.")
+        st.error(f"Error al procesar el archivo o generar el gráfico.")

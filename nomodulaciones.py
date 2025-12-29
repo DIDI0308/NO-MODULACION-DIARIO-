@@ -90,11 +90,12 @@ if uploaded_file is not None:
             fecha_sel = st.selectbox("Filtrar por fecha:", sorted(df_no_mod['Fecha'].unique(), reverse=True))
             df_f = df_no_mod[df_no_mod['Fecha'] == fecha_sel].copy()
 
-            # --- CONVERSIÓN FORZADA A TEXTO (ELIMINANDO .0 SI EXISTE) ---
-            # Esto asegura que códigos como 12345 no se vean como 12345.0 o en notación científica
+            # --- CONVERSIÓN FORZADA A TEXTO PURO ---
+            # Eliminamos cualquier formato numérico (como el .0) y forzamos a STRING
             for col in ['Client', 'F.Pedido']:
                 if col in df_f.columns:
-                    df_f[col] = df_f[col].apply(lambda x: str(int(x)) if isinstance(x, (float, int)) and not pd.isna(x) else str(x))
+                    # Convierte a entero primero para quitar el .0 y luego a string
+                    df_f[col] = df_f[col].apply(lambda x: str(int(float(x))) if pd.notna(x) and str(x).replace('.','').isdigit() else str(x))
             
             if 'Motivo' in df_f.columns:
                 df_f['Motivo'] = df_f['Motivo'].astype(str).replace(['nan', 'None'], 'Sin Motivo')
@@ -102,7 +103,7 @@ if uploaded_file is not None:
             resultado = df_f.drop_duplicates(subset=['Client'], keep='first')
             cols = [c for c in ['Client', 'Cam', 'F.Pedido', 'Motivo'] if c in resultado.columns]
 
-            # Renderizado HTML
+            # Renderizado HTML con clase CSS
             html_tabla = resultado[cols].to_html(index=False, classes='tabla-final')
             
             st.write(f"Clientes encontrados: **{len(resultado)}**")

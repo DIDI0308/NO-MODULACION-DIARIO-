@@ -5,27 +5,6 @@ import plotly.express as px
 # Configuración de página
 st.set_page_config(page_title="Reporte de modulación", layout="wide")
 
-# --- ESTILO CSS PARA LA TABLA ---
-# Esto fuerza a los encabezados a ser amarillos, texto negro y centrados
-st.markdown("""
-    <style>
-    /* Estilo para los encabezados de la tabla */
-    thead tr th {
-        background-color: #FFD700 !important;
-        color: black !important;
-        text-align: center !important;
-        font-weight: bold !important;
-    }
-    /* Estilo para centrar el contenido de las celdas */
-    [data-testid="stDataFrame"] div[role="gridcell"] {
-        text-align: center !important;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
 st.title("ADH MODULACIÓN CD EA")
 
 uploaded_file = st.file_uploader("Sube tu archivo Excel", type=['xlsx'])
@@ -46,6 +25,7 @@ if uploaded_file is not None:
         # Filtro base permanente: Solo DPS 88
         df_base = df[df['DPS'].astype(str).str.contains('88')].copy()
 
+        # Lógica de validación para columna BUSCA
         def es_valido(valor):
             if pd.isna(valor) or valor == "" or "error" in str(valor).lower() or "#" in str(valor):
                 return False
@@ -90,7 +70,7 @@ if uploaded_file is not None:
         fig.update_layout(yaxis=dict(range=[0, 115]), xaxis={'type': 'category'})
         st.plotly_chart(fig, use_container_width=True)
 
-        # --- SECCIÓN 2: DIARIO NO MODULACIÓN ---
+        # --- SECCIÓN 2: CLIENTES ---
         st.markdown("---")
         st.header("DIARIO")
         st.subheader("NO MODULACIÓN")
@@ -109,18 +89,37 @@ if uploaded_file is not None:
                 df_final_clientes['Motivo'] = "Columna no encontrada"
 
             resultado_tabla = df_final_clientes.drop_duplicates(subset=['Client'], keep='first')
-
             columnas_finales = ['Client', 'Cam', 'F.Pedido', 'Motivo']
             cols_ok = [c for c in columnas_finales if c in resultado_tabla.columns]
-
-            st.write(f"Resultados encontrados para el día seleccionado: **{len(resultado_tabla)}**")
             
-            # Usamos dataframe con el CSS inyectado arriba
-            st.dataframe(
-                resultado_tabla[cols_ok], 
-                use_container_width=True, 
-                hide_index=True
-            )
+            # --- APLICACIÓN DE ESTILO SI O SI ---
+            # Filtramos solo las columnas deseadas
+            tabla_estilizada = resultado_tabla[cols_ok].reset_index(drop=True)
+
+            # Estilo CSS para encabezados y celdas
+            def aplicar_estilo_amarillo(styler):
+                # Centrar texto y definir bordes para todas las celdas
+                styler.set_properties(**{
+                    'text-align': 'center',
+                    'border': '1px solid black'
+                })
+                # Estilo específico para los encabezados (Amarillo, Texto Negro, Centrado)
+                styler.set_table_styles([
+                    {'selector': 'th', 'props': [
+                        ('background-color', '#FFD700'),
+                        ('color', 'black'),
+                        ('text-align', 'center'),
+                        ('font-weight', 'bold'),
+                        ('border', '1px solid black')
+                    ]}
+                ])
+                return styler
+
+            st.write(f"Resultados encontrados para el día seleccionado: **{len(tabla_estilizada)}**")
+            
+            # Renderizar tabla con estilos aplicados
+            st.table(aplicar_estilo_amarillo(tabla_estilizada.style))
+
         else:
             st.warning("No se encontraron registros de Clientes No Modulados.")
 

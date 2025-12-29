@@ -5,19 +5,13 @@ import plotly.express as px
 # Configuración de página
 st.set_page_config(page_title="Reporte de modulación", layout="wide")
 
-# --- INYECCIÓN DE CSS GLOBAL PARA EL FORMATO DE LA TABLA ---
+# --- INYECCIÓN DE CSS GLOBAL (Bordes blancos, Amarillo, Centrado) ---
 st.markdown("""
     <style>
-    .tabla-container {
-        display: flex;
-        justify-content: center;
-        width: 100%;
-        margin-top: 20px;
-    }
     .tabla-final {
         width: 100%;
         border-collapse: collapse;
-        border: 2px solid white !important; /* Bordes exteriores blancos */
+        border: 2px solid white !important;
         font-family: Arial, sans-serif;
     }
     .tabla-final thead th {
@@ -25,15 +19,14 @@ st.markdown("""
         color: black !important; /* Texto Negro */
         text-align: center !important;
         padding: 12px !important;
-        border: 2px solid white !important; /* Bordes internos blancos */
-        font-weight: bold;
+        border: 2px solid white !important; /* Bordes blancos */
     }
     .tabla-final tbody td {
         background-color: #F8F9FA !important;
         color: black !important;
         text-align: center !important;
         padding: 10px !important;
-        border: 2px solid white !important; /* Bordes internos blancos */
+        border: 2px solid white !important; /* Bordes blancos */
     }
     </style>
     """, unsafe_allow_html=True)
@@ -77,8 +70,8 @@ if uploaded_file is not None:
         else:
             df_g = df_base.copy()
 
-        # Agrupar para gráfico
-        resumen = df_g.groupby('Fecha' if opcion_graf != "Histórico" else df_g['Entrega'].dt.to_period('M').astype(str)).apply(
+        agrupar = 'Fecha' if opcion_graf != "Histórico" else df_g['Entrega'].dt.to_period('M').astype(str)
+        resumen = df_g.groupby(agrupar).apply(
             lambda x: pd.Series({'% Modulación': (x[x['es_modulado']]['CONCATENADO'].nunique() / x['CONCATENADO'].nunique()) * 100})
         ).reset_index()
 
@@ -97,28 +90,26 @@ if uploaded_file is not None:
             fecha_sel = st.selectbox("Filtrar por fecha:", sorted(df_no_mod['Fecha'].unique(), reverse=True))
             df_f = df_no_mod[df_no_mod['Fecha'] == fecha_sel].copy()
 
-            # --- CONVERSIÓN CRÍTICA A TEXTO ---
-            # Forzamos que estas columnas sean tratadas como texto puro
-            df_f['Client'] = df_f['Client'].astype(str)
-            df_f['F.Pedido'] = df_f['F.Pedido'].astype(str)
+            # --- CONVERSIÓN FORZADA A TEXTO (ELIMINANDO .0 SI EXISTE) ---
+            # Esto asegura que códigos como 12345 no se vean como 12345.0 o en notación científica
+            for col in ['Client', 'F.Pedido']:
+                if col in df_f.columns:
+                    df_f[col] = df_f[col].apply(lambda x: str(int(x)) if isinstance(x, (float, int)) and not pd.isna(x) else str(x))
             
             if 'Motivo' in df_f.columns:
                 df_f['Motivo'] = df_f['Motivo'].astype(str).replace(['nan', 'None'], 'Sin Motivo')
 
-            # Eliminar duplicados por Client
             resultado = df_f.drop_duplicates(subset=['Client'], keep='first')
-            
-            # Columnas requeridas
             cols = [c for c in ['Client', 'Cam', 'F.Pedido', 'Motivo'] if c in resultado.columns]
 
-            # Renderizado de la tabla con la clase CSS personalizada
+            # Renderizado HTML
             html_tabla = resultado[cols].to_html(index=False, classes='tabla-final')
             
             st.write(f"Clientes encontrados: **{len(resultado)}**")
-            st.markdown(f'<div class="tabla-container">{html_tabla}</div>', unsafe_allow_html=True)
+            st.markdown(html_tabla, unsafe_allow_html=True)
             
         else:
             st.warning("No hay datos para Clientes No Modulados.")
 
     except Exception as e:
-        st.error(f"Error en el proceso: {e}")
+        st.error(f"Error: {e}")

@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 
 st.set_page_config(page_title="Contador 3.30.8", layout="centered")
 
@@ -12,8 +13,7 @@ if uploaded_file is not None:
         # 1. Cargar la hoja específica
         df = pd.read_excel(uploaded_file, sheet_name="3.30.8")
 
-        # --- PROCESAMIENTO ---
-        # Convertir 'Entrega' a fecha y 'DPS' a texto para evitar errores de tipo
+        # --- PROCESAMIENTO INICIAL ---
         df['Entrega'] = pd.to_datetime(df['Entrega'], errors='coerce')
         df = df.dropna(subset=['Entrega'])
         df['Fecha_Corta'] = df['Entrega'].dt.date
@@ -27,19 +27,35 @@ if uploaded_file is not None:
             format_func=lambda x: x.strftime('%d/%m/%Y')
         )
 
-        # --- LÓGICA DE FILTRADO ---
-        # Filtramos por fecha elegida Y por DPS igual a 88
-        df_filtrado = df[
+        # --- APLICACIÓN DE FILTROS BASE (Fecha y DPS 88) ---
+        df_base = df[
             (df['Fecha_Corta'] == fecha_elegida) & 
             (df['DPS'].astype(str).str.contains('88'))
         ]
 
-        # --- RESULTADO ÚNICO ---
-        conteo_unico = df_filtrado['CONCATENADO'].nunique()
+        # --- CÁLCULOS ---
+        
+        # 1. Conteo de Concatenados Únicos
+        conteo_unico = df_base['CONCATENADO'].nunique()
 
+        # 2. Conteo de "Modulados" (Columna BUSCA con número válido)
+        # Convertimos a numérico: lo que no es número se vuelve NaN
+        busqueda_numerica = pd.to_numeric(df_base['BUSCA'], errors='coerce')
+        # Contamos solo los que no son nulos (números válidos)
+        conteo_modulados = busqueda_numerica.notnull().sum()
+
+        # --- VISUALIZACIÓN ---
         st.markdown("---")
-        st.metric(label=f"Valores únicos de 'CONCATENADO' (DPS 88)", value=conteo_unico)
-        st.caption(f"Fecha consultada: {fecha_elegida.strftime('%d/%m/%Y')}")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.metric(label="Únicos CONCATENADO", value=conteo_unico)
+            
+        with col2:
+            st.metric(label="Modulados", value=int(conteo_modulados))
+
+        st.caption(f"Filtros aplicados: Fecha {fecha_elegida.strftime('%d/%m/%Y')} y DPS 88")
 
     except Exception as e:
-        st.error(f"Error: Asegúrate de que la hoja se llame '3.30.8' y contenga las columnas 'Entrega', 'DPS' y 'CONCATENADO'.")
+        st.error(f"Error: Revisa que las columnas 'Entrega', 'DPS', 'CONCATENADO' y 'BUSCA' existan.")

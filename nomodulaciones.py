@@ -5,24 +5,53 @@ import plotly.express as px
 # Configuración de página
 st.set_page_config(page_title="Reporte de modulación", layout="wide")
 
+# --- INYECCIÓN DE CSS GLOBAL PARA EL FORMATO DE LA TABLA ---
+st.markdown("""
+    <style>
+    .tabla-container {
+        display: flex;
+        justify-content: center;
+        width: 100%;
+        margin-top: 20px;
+    }
+    .tabla-final {
+        width: 100%;
+        border-collapse: collapse;
+        border: 2px solid white !important; /* Bordes exteriores blancos */
+        font-family: Arial, sans-serif;
+    }
+    .tabla-final thead th {
+        background-color: #FFD700 !important; /* Amarillo */
+        color: black !important; /* Texto Negro */
+        text-align: center !important;
+        padding: 12px !important;
+        border: 2px solid white !important; /* Bordes internos blancos */
+        font-weight: bold;
+    }
+    .tabla-final tbody td {
+        background-color: #F8F9FA !important;
+        color: black !important;
+        text-align: center !important;
+        padding: 10px !important;
+        border: 2px solid white !important; /* Bordes internos blancos */
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 st.title("ADH MODULACIÓN CD EA")
 
 uploaded_file = st.file_uploader("Sube tu archivo Excel", type=['xlsx'])
 
 if uploaded_file is not None:
     try:
-        # 1. Cargar datos (Hoja específica)
+        # 1. Cargar datos
         df = pd.read_excel(uploaded_file, sheet_name="3.30.8")
-        
-        # LIMPIEZA TOTAL DE COLUMNAS
         df.columns = df.columns.str.strip()
 
         # --- PROCESAMIENTO BASE ---
         df['Entrega'] = pd.to_datetime(df['Entrega'], errors='coerce')
         df = df.dropna(subset=['Entrega'])
         df['Fecha'] = df['Entrega'].dt.date
-        
-        # Filtro base permanente: Solo DPS 88
         df_base = df[df['DPS'].astype(str).str.contains('88')].copy()
 
         def es_valido(valor):
@@ -36,98 +65,60 @@ if uploaded_file is not None:
 
         df_base['es_modulado'] = df_base['BUSCA'].apply(es_valido)
 
-        # --- SECCIÓN 1: GRÁFICO DE MODULACIÓN ---
+        # --- SECCIÓN 1: GRÁFICO ---
         st.markdown("### Evolución de Modulación")
-        opcion_graf = st.selectbox(
-            "Selecciona el periodo para el gráfico:",
-            ["Últimos 7 días", "Mes Actual", "Histórico"]
-        )
-
+        opcion_graf = st.selectbox("Selecciona el periodo:", ["Últimos 7 días", "Mes Actual", "Histórico"])
         ultima_fecha = df_base['Entrega'].max()
         
         if opcion_graf == "Últimos 7 días":
             df_g = df_base[df_base['Fecha'] > (ultima_fecha - pd.Timedelta(days=7)).date()]
-            agrupar = 'Fecha'
         elif opcion_graf == "Mes Actual":
-            df_g = df_base[(df_base['Entrega'].dt.month == ultima_fecha.month) & 
-                           (df_base['Entrega'].dt.year == ultima_fecha.year)]
-            agrupar = 'Fecha'
+            df_g = df_base[(df_base['Entrega'].dt.month == ultima_fecha.month) & (df_base['Entrega'].dt.year == ultima_fecha.year)]
         else:
             df_g = df_base.copy()
-            df_g['Periodo'] = df_base['Entrega'].dt.to_period('M').astype(str)
-            agrupar = 'Periodo'
 
-        resumen = df_g.groupby(agrupar).apply(lambda x: pd.Series({
-            'Total': x['CONCATENADO'].nunique(),
-            'Modulados': x[x['es_modulado']]['CONCATENADO'].nunique()
-        })).reset_index()
-        resumen['% Modulación'] = (resumen['Modulados'] / resumen['Total']) * 100
+        # Agrupar para gráfico
+        resumen = df_g.groupby('Fecha' if opcion_graf != "Histórico" else df_g['Entrega'].dt.to_period('M').astype(str)).apply(
+            lambda x: pd.Series({'% Modulación': (x[x['es_modulado']]['CONCATENADO'].nunique() / x['CONCATENADO'].nunique()) * 100})
+        ).reset_index()
 
-        fig = px.bar(resumen.sort_values(agrupar), x=agrupar, y='% Modulación', 
-                     text='% Modulación', color_discrete_sequence=['#FFD700'])
+        fig = px.bar(resumen, x=resumen.columns[0], y='% Modulación', text='% Modulación', color_discrete_sequence=['#FFD700'])
         fig.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
-        fig.update_layout(yaxis=dict(range=[0, 115]), xaxis={'type': 'category'})
         st.plotly_chart(fig, use_container_width=True)
 
-        # --- SECCIÓN 2: CLIENTES ---
+        # --- SECCIÓN 2: CLIENTES NO MODULADOS ---
         st.markdown("---")
         st.header("DIARIO")
         st.subheader("NO MODULACIÓN")
         
-        df_no_modulados = df_base[df_base['es_modulado'] == False].copy()
+        df_no_mod = df_base[df_base['es_modulado'] == False].copy()
 
-        if not df_no_modulados.empty:
-            fechas_disponibles = sorted(df_no_modulados['Fecha'].unique(), reverse=True)
-            fecha_sel = st.selectbox("Filtrar por fecha específica:", fechas_disponibles)
+        if not df_no_mod.empty:
+            fecha_sel = st.selectbox("Filtrar por fecha:", sorted(df_no_mod['Fecha'].unique(), reverse=True))
+            df_f = df_no_mod[df_no_mod['Fecha'] == fecha_sel].copy()
 
-            df_final_clientes = df_no_modulados[df_no_modulados['Fecha'] == fecha_sel].copy()
-
-            # FORZAR TEXTO SI O SI PARA CLIENT Y F.PEDIDO
-            df_final_clientes['Client'] = df_final_clientes['Client'].astype(str)
-            df_final_clientes['F.Pedido'] = df_final_clientes['F.Pedido'].astype(str)
-
-            if 'Motivo' in df_final_clientes.columns:
-                df_final_clientes['Motivo'] = df_final_clientes['Motivo'].astype(str).replace(['nan', 'None'], 'Sin Motivo')
+            # --- CONVERSIÓN CRÍTICA A TEXTO ---
+            # Forzamos que estas columnas sean tratadas como texto puro
+            df_f['Client'] = df_f['Client'].astype(str)
+            df_f['F.Pedido'] = df_f['F.Pedido'].astype(str)
             
-            resultado_tabla = df_final_clientes.drop_duplicates(subset=['Client'], keep='first')
-            columnas_finales = ['Client', 'Cam', 'F.Pedido', 'Motivo']
-            cols_ok = [c for c in columnas_finales if c in resultado_tabla.columns]
+            if 'Motivo' in df_f.columns:
+                df_f['Motivo'] = df_f['Motivo'].astype(str).replace(['nan', 'None'], 'Sin Motivo')
 
-            # --- INYECCIÓN DE CSS GLOBAL PARA BORDES BLANCOS Y AMARILLO ---
-            st.markdown(
-                """
-                <style>
-                table {
-                    width: 100% !important;
-                    border-collapse: collapse !important;
-                    border: 2px solid white !important;
-                }
-                thead th {
-                    background-color: #FFD700 !important;
-                    color: black !important;
-                    text-align: center !important;
-                    border: 2px solid white !important;
-                    padding: 10px !important;
-                }
-                tbody td {
-                    text-align: center !important;
-                    border: 2px solid white !important;
-                    padding: 8px !important;
-                    background-color: #f8f9fa !important;
-                    color: black !important;
-                }
-                </style>
-                """, unsafe_allow_html=True
-            )
+            # Eliminar duplicados por Client
+            resultado = df_f.drop_duplicates(subset=['Client'], keep='first')
             
-            # Generación de la tabla HTML
-            tabla_html = resultado_tabla[cols_ok].to_html(index=False)
+            # Columnas requeridas
+            cols = [c for c in ['Client', 'Cam', 'F.Pedido', 'Motivo'] if c in resultado.columns]
+
+            # Renderizado de la tabla con la clase CSS personalizada
+            html_tabla = resultado[cols].to_html(index=False, classes='tabla-final')
             
-            st.write(f"Clientes encontrados: **{len(resultado_tabla)}**")
-            st.markdown(tabla_html, unsafe_allow_html=True)
+            st.write(f"Clientes encontrados: **{len(resultado)}**")
+            st.markdown(f'<div class="tabla-container">{html_tabla}</div>', unsafe_allow_html=True)
             
         else:
-            st.warning("No se encontraron registros de No Modulación.")
+            st.warning("No hay datos para Clientes No Modulados.")
 
     except Exception as e:
-        st.error(f"Error en el procesamiento: {e}")
+        st.error(f"Error en el proceso: {e}")

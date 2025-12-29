@@ -82,7 +82,7 @@ if uploaded_file is not None:
 
             df_final_clientes = df_no_modulados[df_no_modulados['Fecha'] == fecha_sel].copy()
 
-            # FORZAR COLUMNAS COMO TEXTO (IMPORTANTE)
+            # FORZAR TEXTO SI O SI PARA CLIENT Y F.PEDIDO
             df_final_clientes['Client'] = df_final_clientes['Client'].astype(str)
             df_final_clientes['F.Pedido'] = df_final_clientes['F.Pedido'].astype(str)
 
@@ -93,41 +93,37 @@ if uploaded_file is not None:
             columnas_finales = ['Client', 'Cam', 'F.Pedido', 'Motivo']
             cols_ok = [c for c in columnas_finales if c in resultado_tabla.columns]
 
-            # --- ESTILO HTML/CSS CON BORDES BLANCOS ---
-            estilo_css = """
-            <style>
-                .tabla-contenedor { padding: 10px; }
-                .tabla-final {
-                    width: 100%;
-                    border-collapse: collapse;
-                    font-family: Arial, sans-serif;
-                    border: 2px solid white !important; /* Borde exterior blanco */
+            # --- INYECCIÓN DE CSS GLOBAL PARA BORDES BLANCOS Y AMARILLO ---
+            st.markdown(
+                """
+                <style>
+                table {
+                    width: 100% !important;
+                    border-collapse: collapse !important;
+                    border: 2px solid white !important;
                 }
-                .tabla-final thead th {
+                thead th {
                     background-color: #FFD700 !important;
                     color: black !important;
                     text-align: center !important;
-                    padding: 12px;
-                    font-weight: bold;
-                    border: 1px solid white !important; /* Bordes internos blancos */
+                    border: 2px solid white !important;
+                    padding: 10px !important;
                 }
-                .tabla-final tbody td {
+                tbody td {
                     text-align: center !important;
-                    padding: 10px;
-                    background-color: #f9f9f9;
-                    color: #333;
-                    border: 1px solid white !important; /* Bordes internos blancos */
+                    border: 2px solid white !important;
+                    padding: 8px !important;
+                    background-color: #f8f9fa !important;
+                    color: black !important;
                 }
-                .tabla-final tbody tr:nth-child(even) td {
-                    background-color: #f1f1f1;
-                }
-            </style>
-            """
+                </style>
+                """, unsafe_allow_html=True
+            )
             
-            tabla_html = resultado_tabla[cols_ok].to_html(index=False, classes='tabla-final')
+            # Generación de la tabla HTML
+            tabla_html = resultado_tabla[cols_ok].to_html(index=False)
             
             st.write(f"Clientes encontrados: **{len(resultado_tabla)}**")
-            st.markdown(estilo_css, unsafe_allow_html=True)
             st.markdown(tabla_html, unsafe_allow_html=True)
             
         else:

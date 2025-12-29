@@ -14,7 +14,7 @@ if uploaded_file is not None:
         # 1. Cargar datos (Hoja específica)
         df = pd.read_excel(uploaded_file, sheet_name="3.30.8")
         
-        # LIMPIEZA TOTAL DE COLUMNAS
+        # LIMPIEZA TOTAL DE COLUMNAS (Elimina espacios ocultos)
         df.columns = df.columns.str.strip()
 
         # --- PROCESAMIENTO BASE ---
@@ -89,39 +89,49 @@ if uploaded_file is not None:
             else:
                 df_final_clientes['Motivo'] = "Columna no encontrada"
 
+            # Sin repetidos según 'Client'
             resultado_tabla = df_final_clientes.drop_duplicates(subset=['Client'], keep='first')
             columnas_finales = ['Client', 'Cam', 'F.Pedido', 'Motivo']
             cols_ok = [c for c in columnas_finales if c in resultado_tabla.columns]
 
-            # --- ESTILO CSS PARA LA TABLA ---
-            # Forzamos celdas amarillas, texto negro y centrado
+            # --- DISEÑO DE TABLA CON FORMATO FORZADO ---
+            # Inyectamos CSS para bordes, colores y centrado
             st.markdown("""
                 <style>
-                .custom-table {
-                    width: 100%;
-                    border-collapse: collapse;
-                    text-align: center;
+                .tabla-contenedor {
+                    display: flex;
+                    justify-content: center;
+                    margin: 20px 0;
                 }
-                .custom-table th {
+                table.dataframe-custom {
+                    width: 100%;
+                    border: 1px solid black;
+                    border-collapse: collapse;
+                }
+                table.dataframe-custom th {
                     background-color: #FFD700 !important;
                     color: black !important;
-                    font-weight: bold;
-                    padding: 10px;
-                    border: 1px solid #ddd;
+                    border: 1px solid black !important;
+                    text-align: center !important;
+                    padding: 12px;
+                    font-size: 16px;
                 }
-                .custom-table td {
-                    padding: 8px;
-                    border: 1px solid #ddd;
-                    text-align: center;
+                table.dataframe-custom td {
+                    border: 1px solid black !important;
+                    text-align: center !important;
+                    padding: 10px;
+                    background-color: white;
+                    color: black;
                 }
                 </style>
             """, unsafe_allow_html=True)
 
-            # Convertir DataFrame a HTML con la clase personalizada
-            tabla_html = resultado_tabla[cols_ok].to_html(classes='custom-table', index=False, escape=False)
+            # Generar HTML de la tabla con la clase CSS aplicada
+            html_tabla = resultado_tabla[cols_ok].to_html(index=False, classes='dataframe-custom')
             
             st.write(f"Resultados encontrados: **{len(resultado_tabla)}**")
-            st.markdown(tabla_html, unsafe_allow_html=True)
+            # Mostrar la tabla HTML
+            st.markdown(html_tabla, unsafe_allow_html=True)
             
         else:
             st.warning("No se encontraron registros de Clientes No Modulados.")

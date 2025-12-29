@@ -75,51 +75,42 @@ if uploaded_file is not None:
         st.header("DIARIO")
         st.subheader("NO MODULACIÓN")
         
+        # Filtramos los NO modulados
         df_no_modulados = df_base[df_base['es_modulado'] == False].copy()
 
         if not df_no_modulados.empty:
+            # Selector de fecha
             fechas_disponibles = sorted(df_no_modulados['Fecha'].unique(), reverse=True)
             fecha_sel = st.selectbox("Filtrar por fecha específica:", fechas_disponibles)
 
+            # Filtro por fecha seleccionada
             df_final_clientes = df_no_modulados[df_no_modulados['Fecha'] == fecha_sel].copy()
 
+            # Forzar la existencia de la columna Motivo y tratarla como texto
             if 'Motivo' in df_final_clientes.columns:
                 df_final_clientes['Motivo'] = df_final_clientes['Motivo'].astype(str).replace(['nan', 'None'], 'Sin Motivo')
             else:
                 df_final_clientes['Motivo'] = "Columna no encontrada"
 
+            # Sin repetidos según 'Client'
             resultado_tabla = df_final_clientes.drop_duplicates(subset=['Client'], keep='first')
             columnas_finales = ['Client', 'Cam', 'F.Pedido', 'Motivo']
             cols_ok = [c for c in columnas_finales if c in resultado_tabla.columns]
             
-            # --- APLICACIÓN DE ESTILO SI O SI ---
-            # Filtramos solo las columnas deseadas
-            tabla_estilizada = resultado_tabla[cols_ok].reset_index(drop=True)
+            # --- ESTILIZACIÓN DE LA TABLA ---
+            # Aplicar fondo amarillo, texto negro y centrado a los encabezados
+            st_styled = resultado_tabla[cols_ok].style.set_table_styles([
+                {'selector': 'th', 'props': [
+                    ('background-color', '#FFD700'), 
+                    ('color', 'black'), 
+                    ('text-align', 'center'),
+                    ('font-weight', 'bold')
+                ]},
+                {'selector': 'td', 'props': [('text-align', 'center')]}
+            ])
 
-            # Estilo CSS para encabezados y celdas
-            def aplicar_estilo_amarillo(styler):
-                # Centrar texto y definir bordes para todas las celdas
-                styler.set_properties(**{
-                    'text-align': 'center',
-                    'border': '1px solid black'
-                })
-                # Estilo específico para los encabezados (Amarillo, Texto Negro, Centrado)
-                styler.set_table_styles([
-                    {'selector': 'th', 'props': [
-                        ('background-color', '#FFD700'),
-                        ('color', 'black'),
-                        ('text-align', 'center'),
-                        ('font-weight', 'bold'),
-                        ('border', '1px solid black')
-                    ]}
-                ])
-                return styler
-
-            st.write(f"Resultados encontrados para el día seleccionado: **{len(tabla_estilizada)}**")
-            
-            # Renderizar tabla con estilos aplicados
-            st.table(aplicar_estilo_amarillo(tabla_estilizada.style))
-
+            st.write(f"Resultados encontrados para el día seleccionado: **{len(resultado_tabla)}**")
+            st.dataframe(st_styled, use_container_width=True, hide_index=True)
         else:
             st.warning("No se encontraron registros de Clientes No Modulados.")
 

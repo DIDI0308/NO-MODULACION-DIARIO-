@@ -1,10 +1,9 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime, timedelta
 
-st.set_page_config(page_title="Dashboard Modulación 3.30.8", layout="wide")
+st.set_page_config(page_title="Reporte 3.30.8", layout="wide")
 
-st.title("📊 Análisis de Modulación por Periodos")
+st.title("📊 Análisis de Modulación")
 
 uploaded_file = st.file_uploader("Sube tu archivo Excel", type=['xlsx'])
 
@@ -32,23 +31,26 @@ if uploaded_file is not None:
 
         df_base['es_modulado'] = df_base['BUSCA'].apply(es_valido)
 
-        # --- FILTROS DE TIEMPO (Debajo del título) ---
+        # --- SELECTOR DE FILTRO ---
         opcion = st.selectbox(
             "Selecciona el periodo de análisis:",
-            ["Últimos 7 días", "Último Mes", "Promedio Mensual (Histórico)"]
+            ["Últimos 7 días", "Mes Actual", "Promedio Mensual (Histórico)"]
         )
 
-        # Determinar fecha de referencia (la más reciente en el archivo)
-        hoy = df_base['Fecha'].max()
+        # Fecha de referencia (La última fecha que aparezca en el Excel)
+        ultima_fecha = df_base['Entrega'].max()
         
         if opcion == "Últimos 7 días":
-            fecha_limite = hoy - timedelta(days=7)
+            fecha_limite = (ultima_fecha - pd.Timedelta(days=7)).date()
             df_final = df_base[df_base['Fecha'] > fecha_limite]
             agrupar_por = 'Fecha'
             
-        elif opcion == "Último Mes":
-            fecha_limite = hoy - timedelta(days=30)
-            df_final = df_base[df_base['Fecha'] > fecha_limite]
+        elif opcion == "Mes Actual":
+            # Filtra solo los días que pertenecen al mismo Mes y Año de la última fecha
+            df_final = df_base[
+                (df_base['Entrega'].dt.month == ultima_fecha.month) & 
+                (df_base['Entrega'].dt.year == ultima_fecha.year)
+            ]
             agrupar_por = 'Fecha'
             
         else: # Promedio Mensual
@@ -69,9 +71,7 @@ if uploaded_file is not None:
 
         # --- VISUALIZACIÓN ---
         st.markdown("---")
-        st.subheader(f"Vista: {opcion}")
         
-        # Formateo dinámico según la vista
         formatos = {
             'Total Concatenados': '{:,.0f}',
             'Modulados': '{:,.0f}',
@@ -81,7 +81,7 @@ if uploaded_file is not None:
         if agrupar_por == 'Fecha':
             formatos['Fecha'] = lambda x: x.strftime('%d/%m/%Y')
         else:
-            formatos['Periodo'] = lambda x: str(x)
+            formatos[agrupar_por] = lambda x: str(x)
 
         st.dataframe(
             resumen.style.format(formatos), 
@@ -89,10 +89,5 @@ if uploaded_file is not None:
             hide_index=True
         )
 
-        # Si es promedio mensual, mostrar el promedio global del periodo
-        if opcion == "Promedio Mensual (Histórico)":
-            prom_global = resumen['% Modulación'].mean()
-            st.metric("Promedio de Modulación Histórico", f"{prom_global:.2f}%")
-
     except Exception as e:
-        st.error(f"Error: Asegúrate de que la hoja se llame '3.30.8' y contenga las columnas requeridas.")
+        st.error(f"Error al procesar: {e}")

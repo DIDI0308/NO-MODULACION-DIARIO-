@@ -14,6 +14,10 @@ if uploaded_file is not None:
         # 1. Cargar datos (Hoja específica)
         df = pd.read_excel(uploaded_file, sheet_name="3.30.8")
 
+        # --- LIMPIEZA CRÍTICA DE COLUMNAS ---
+        # Esto quita los espacios extras como "Motivo    " y los deja como "Motivo"
+        df.columns = df.columns.str.strip()
+
         # --- PROCESAMIENTO BASE ---
         df['Entrega'] = pd.to_datetime(df['Entrega'], errors='coerce')
         df = df.dropna(subset=['Entrega'])
@@ -22,7 +26,6 @@ if uploaded_file is not None:
         # Filtro base permanente: Solo DPS 88
         df_base = df[df['DPS'].astype(str).str.contains('88')].copy()
 
-        # Lógica de validación para columna BUSCA
         def es_valido(valor):
             if pd.isna(valor) or valor == "" or "error" in str(valor).lower() or "#" in str(valor):
                 return False
@@ -56,7 +59,6 @@ if uploaded_file is not None:
             df_graf['Periodo'] = df_base['Entrega'].dt.to_period('M').astype(str)
             agrupar_por = 'Periodo'
 
-        # Cálculo de métricas para el gráfico
         resumen = df_graf.groupby(agrupar_por).apply(
             lambda x: pd.Series({
                 'Total': x['CONCATENADO'].nunique(),
@@ -65,7 +67,6 @@ if uploaded_file is not None:
         ).reset_index()
         resumen['% Modulación'] = (resumen['Modulados'] / resumen['Total']) * 100
 
-        # Mostrar gráfico de barras amarillas
         fig = px.bar(resumen.sort_values(agrupar_por), x=agrupar_por, y='% Modulación', 
                      text='% Modulación', color_discrete_sequence=['#FFD700'])
         fig.update_traces(texttemplate='%{text:.1f}%', textposition='outside')
@@ -76,37 +77,29 @@ if uploaded_file is not None:
         st.markdown("---")
         st.markdown("### ⚠️ Reporte de Registros con Error (BUSCA No Válido)")
         
-        # Filtramos solo los que NO son modulados (Errores en BUSCA)
         df_errores = df_base[df_base['es_modulado'] == False].copy()
 
         if not df_errores.empty:
-            # Selector visual de una fecha específica
             fechas_disponibles = sorted(df_errores['Fecha'].unique(), reverse=True)
             fecha_filtro = st.selectbox("Elige una fecha para ver los errores detallados:", fechas_disponibles)
 
-            # Filtro por la fecha seleccionada
             df_error_fecha = df_errores[df_errores['Fecha'] == fecha_filtro].copy()
 
-            # Columnas requeridas: Client, F.Pedido y Motivo (según tu imagen)
-            col_motivo = "Motivo" 
-            cols_deseadas = ['Client', 'F.Pedido', col_motivo]
+            # Ahora que limpiamos los nombres con .strip(), 'Motivo' funcionará
+            cols_deseadas = ['Client', 'F.Pedido', 'Motivo']
             
-            # Limpiar y asegurar que la columna Motivo sea visible
-            if col_motivo in df_error_fecha.columns:
-                df_error_fecha[col_motivo] = df_error_fecha[col_motivo].fillna("Sin información").astype(str)
+            if 'Motivo' in df_error_fecha.columns:
+                df_error_fecha['Motivo'] = df_error_fecha['Motivo'].fillna("Sin información").astype(str)
             
-            # Lógica: Sin repetidos según 'Client', manteniendo solo el primero
+            # Sin repetidos según 'Client', mostrando solo el primero
             resultado_final = df_error_fecha.drop_duplicates(subset=['Client'], keep='first')
 
-            # Filtrar solo las columnas que existen en el DataFrame para evitar errores
             cols_finales = [c for c in cols_deseadas if c in resultado_final.columns]
 
-            st.write(f"Se encontraron **{len(resultado_final)}** errores únicos de clientes para el día seleccionado.")
-            
-            # Mostrar la tabla final
+            st.write(f"Se encontraron **{len(resultado_final)}** errores únicos de clientes.")
             st.dataframe(resultado_final[cols_finales], use_container_width=True, hide_index=True)
         else:
-            st.success("🎉 ¡Excelente! No se detectaron errores de búsqueda en este archivo.")
+            st.success("No se detectaron errores de búsqueda.")
 
     except Exception as e:
-        st.error(f"Error en el procesamiento: {e}")
+        st.error(f"Error: {e}")

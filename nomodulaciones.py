@@ -14,7 +14,7 @@ if uploaded_file is not None:
         # 1. Cargar datos (Hoja específica)
         df = pd.read_excel(uploaded_file, sheet_name="3.30.8")
         
-        # LIMPIEZA TOTAL DE COLUMNAS (Elimina espacios ocultos en "Motivo    ", "Cam", etc.)
+        # LIMPIEZA TOTAL DE COLUMNAS
         df.columns = df.columns.str.strip()
 
         # --- PROCESAMIENTO BASE ---
@@ -79,45 +79,41 @@ if uploaded_file is not None:
         df_no_modulados = df_base[df_base['es_modulado'] == False].copy()
 
         if not df_no_modulados.empty:
-            # Selector de fecha
             fechas_disponibles = sorted(df_no_modulados['Fecha'].unique(), reverse=True)
             fecha_sel = st.selectbox("Filtrar por fecha específica:", fechas_disponibles)
 
-            # Filtro por fecha seleccionada
             df_final_clientes = df_no_modulados[df_no_modulados['Fecha'] == fecha_sel].copy()
 
-            # Forzar la existencia de la columna Motivo y tratarla como texto
             if 'Motivo' in df_final_clientes.columns:
                 df_final_clientes['Motivo'] = df_final_clientes['Motivo'].astype(str).replace(['nan', 'None'], 'Sin Motivo')
             else:
                 df_final_clientes['Motivo'] = "Columna no encontrada"
 
-            # Sin repetidos según 'Client', manteniendo solo el primero
             resultado_tabla = df_final_clientes.drop_duplicates(subset=['Client'], keep='first')
-
-            # Columnas estrictamente solicitadas en el orden pedido
             columnas_finales = ['Client', 'Cam', 'F.Pedido', 'Motivo']
             cols_ok = [c for c in columnas_finales if c in resultado_tabla.columns]
 
-            # --- APLICACIÓN DE ESTILOS (Amarillo, Negro y Centrado) ---
-            # Se aplica fondo amarillo (#FFD700) y texto negro a los encabezados (th) 
-            # y alineación centrada a toda la tabla (th y td).
+            # --- APLICACIÓN DE ESTILOS FORZADOS ---
+            # Se usa HTML/CSS para garantizar el fondo amarillo, texto negro y centrado
             st_styled = resultado_tabla[cols_ok].style.set_table_styles([
                 {'selector': 'th', 'props': [
                     ('background-color', '#FFD700'), 
                     ('color', 'black'), 
                     ('text-align', 'center'),
                     ('font-weight', 'bold'),
-                    ('border', '1px solid black')
+                    ('padding', '10px')
                 ]},
                 {'selector': 'td', 'props': [
                     ('text-align', 'center'),
-                    ('border', '1px solid #ddd')
+                    ('padding', '8px')
                 ]}
-            ])
+            ]).hide(axis="index")
 
             st.write(f"Resultados encontrados para el día seleccionado: **{len(resultado_tabla)}**")
-            st.dataframe(st_styled, use_container_width=True, hide_index=True)
+            
+            # Usamos st.write + to_html para que Streamlit no ignore los estilos CSS
+            st.write(st_styled.to_html(), unsafe_allow_html=True)
+            
         else:
             st.warning("No se encontraron registros de Clientes No Modulados.")
 

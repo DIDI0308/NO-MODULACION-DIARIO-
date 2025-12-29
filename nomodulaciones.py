@@ -14,7 +14,7 @@ if uploaded_file is not None:
         # 1. Cargar datos (Hoja específica)
         df = pd.read_excel(uploaded_file, sheet_name="3.30.8")
         
-        # LIMPIEZA TOTAL DE COLUMNAS
+        # LIMPIEZA TOTAL DE COLUMNAS (Elimina espacios ocultos en "Motivo    ", "Cam", etc.)
         df.columns = df.columns.str.strip()
 
         # --- PROCESAMIENTO BASE ---
@@ -92,21 +92,28 @@ if uploaded_file is not None:
             else:
                 df_final_clientes['Motivo'] = "Columna no encontrada"
 
-            # Sin repetidos según 'Client'
+            # Sin repetidos según 'Client', manteniendo solo el primero
             resultado_tabla = df_final_clientes.drop_duplicates(subset=['Client'], keep='first')
+
+            # Columnas estrictamente solicitadas en el orden pedido
             columnas_finales = ['Client', 'Cam', 'F.Pedido', 'Motivo']
             cols_ok = [c for c in columnas_finales if c in resultado_tabla.columns]
-            
-            # --- ESTILIZACIÓN DE LA TABLA ---
-            # Aplicar fondo amarillo, texto negro y centrado a los encabezados
+
+            # --- APLICACIÓN DE ESTILOS (Amarillo, Negro y Centrado) ---
+            # Se aplica fondo amarillo (#FFD700) y texto negro a los encabezados (th) 
+            # y alineación centrada a toda la tabla (th y td).
             st_styled = resultado_tabla[cols_ok].style.set_table_styles([
                 {'selector': 'th', 'props': [
                     ('background-color', '#FFD700'), 
                     ('color', 'black'), 
                     ('text-align', 'center'),
-                    ('font-weight', 'bold')
+                    ('font-weight', 'bold'),
+                    ('border', '1px solid black')
                 ]},
-                {'selector': 'td', 'props': [('text-align', 'center')]}
+                {'selector': 'td', 'props': [
+                    ('text-align', 'center'),
+                    ('border', '1px solid #ddd')
+                ]}
             ])
 
             st.write(f"Resultados encontrados para el día seleccionado: **{len(resultado_tabla)}**")

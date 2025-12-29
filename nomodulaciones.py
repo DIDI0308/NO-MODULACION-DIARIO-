@@ -1,10 +1,13 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 
+# Configuración de página
 st.set_page_config(page_title="Dashboard Modulación 3.30.8", layout="wide")
 
 st.title("📊 Análisis de Modulación por Periodos")
 
+# Recordatorio: El archivo requirements.txt debe tener: pandas, openpyxl, plotly, streamlit
 uploaded_file = st.file_uploader("Sube tu archivo Excel", type=['xlsx'])
 
 if uploaded_file is not None:
@@ -31,13 +34,12 @@ if uploaded_file is not None:
 
         df_base['es_modulado'] = df_base['BUSCA'].apply(es_valido)
 
-        # --- FILTROS DE TIEMPO ---
+        # --- FILTROS DE TIEMPO (Selector principal) ---
         opcion = st.selectbox(
             "Selecciona el periodo de análisis:",
             ["Últimos 7 días", "Mes Actual (Calendario)", "Promedio Mensual (Histórico)"]
         )
 
-        # Fecha de referencia (la más reciente en el archivo)
         ultima_fecha = df_base['Entrega'].max()
         
         if opcion == "Últimos 7 días":
@@ -46,7 +48,6 @@ if uploaded_file is not None:
             agrupar_por = 'Fecha'
             
         elif opcion == "Mes Actual (Calendario)":
-            # Filtra estrictamente desde el día 1 del mes de la última fecha registrada
             mes_actual = ultima_fecha.month
             anio_actual = ultima_fecha.year
             df_final = df_base[(df_base['Entrega'].dt.month == mes_actual) & 
@@ -55,10 +56,10 @@ if uploaded_file is not None:
             
         else: # Promedio Mensual
             df_final = df_base.copy()
-            df_final['Periodo'] = df_base['Entrega'].dt.to_period('M')
+            df_final['Periodo'] = df_base['Entrega'].dt.to_period('M').astype(str)
             agrupar_por = 'Periodo'
 
-        # --- GENERACIÓN DE TABLA ---
+        # --- GENERACIÓN DE DATOS ---
         resumen = df_final.groupby(agrupar_por).apply(
             lambda x: pd.Series({
                 'Total Concatenados': x['CONCATENADO'].nunique(),
@@ -67,11 +68,44 @@ if uploaded_file is not None:
         ).reset_index()
 
         resumen['% Modulación'] = (resumen['Modulados'] / resumen['Total Concatenados']) * 100
-        resumen = resumen.sort_values(by=agrupar_por, ascending=False)
+        
+        # Ordenar para que el gráfico fluya cronológicamente (de izquierda a derecha)
+        resumen_grafico = resumen.sort_values(by=agrupar_por, ascending=True)
 
         # --- VISUALIZACIÓN ---
         st.markdown("---")
-        st.subheader(f"Vista: {opcion}")
+        
+        # 1. Gráfico de Barras
+        st.subheader(f"Gráfico: % Modulación ({opcion})")
+        
+        fig = px.bar(
+            resumen_grafico,
+            x=agrupar_por,
+            y='% Modulación',
+            color_discrete_sequence=['#FFD700'], # Color Amarillo
+            text='% Modulación'
+        )
+
+        fig.update_traces(
+            texttemplate='%{y:.1f}%', 
+            textposition='outside'
+        )
+
+        fig.update_layout(
+            yaxis_title="% Modulación",
+            xaxis_title="Día / Periodo",
+            yaxis=dict(range=[0, 115]), # Espacio para las etiquetas
+            xaxis={'type': 'category'}  # Evita huecos en fechas vacías
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+        # 2. Tabla Detallada (debajo del gráfico)
+        st.markdown("---")
+        st.subheader("Datos Detallados")
+        
+        # Re-ordenar para la tabla (más reciente primero)
+        resumen_tabla = resumen.sort_values(by=agrupar_por, ascending=False)
         
         formatos = {
             'Total Concatenados': '{:,.0f}',
@@ -85,7 +119,7 @@ if uploaded_file is not None:
             formatos['Periodo'] = lambda x: str(x)
 
         st.dataframe(
-            resumen.style.format(formatos), 
+            resumen_tabla.style.format(formatos), 
             use_container_width=True,
             hide_index=True
         )

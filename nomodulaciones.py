@@ -27,35 +27,34 @@ if uploaded_file is not None:
             format_func=lambda x: x.strftime('%d/%m/%Y')
         )
 
-        # --- APLICACIÓN DE FILTROS BASE (Fecha y DPS 88) ---
+        # --- LÓGICA DE FILTRADO ---
+        # 1. Filtrar por fecha elegida Y por DPS igual a 88
         df_base = df[
             (df['Fecha_Corta'] == fecha_elegida) & 
             (df['DPS'].astype(str).str.contains('88'))
         ]
 
-        # --- CÁLCULOS ---
-        
-        # 1. Conteo de Concatenados Únicos
+        # 2. Conteo de CONCATENADO (Valores únicos)
         conteo_unico = df_base['CONCATENADO'].nunique()
 
-        # 2. Conteo de "Modulados" (Columna BUSCA con número válido)
-        # Convertimos a numérico: lo que no es número se vuelve NaN
-        busqueda_numerica = pd.to_numeric(df_base['BUSCA'], errors='coerce')
-        # Contamos solo los que no son nulos (números válidos)
-        conteo_modulados = busqueda_numerica.notnull().sum()
+        # 3. Conteo de MODULADOS (Columna BUSCA con número válido)
+        # Convertimos a numérico, los errores se vuelven NaN y luego los eliminamos para contar
+        modulados_df = df_base.copy()
+        modulados_df['BUSCA_NUM'] = pd.to_numeric(modulados_df['BUSCA'], errors='coerce')
+        conteo_modulados = modulados_df['BUSCA_NUM'].dropna().count()
 
-        # --- VISUALIZACIÓN ---
+        # --- VISUALIZACIÓN DE DATOS ---
         st.markdown("---")
         
         col1, col2 = st.columns(2)
         
         with col1:
-            st.metric(label="Únicos CONCATENADO", value=conteo_unico)
-            
+            st.metric(label="Concatenados Únicos", value=conteo_unico)
+            st.caption("Filtro: Fecha y DPS 88")
+
         with col2:
             st.metric(label="Modulados", value=int(conteo_modulados))
-
-        st.caption(f"Filtros aplicados: Fecha {fecha_elegida.strftime('%d/%m/%Y')} y DPS 88")
+            st.caption("Filtro: BUSCA (Números válidos)")
 
     except Exception as e:
-        st.error(f"Error: Revisa que las columnas 'Entrega', 'DPS', 'CONCATENADO' y 'BUSCA' existan.")
+        st.error(f"Error: Revisa que existan las columnas 'Entrega', 'DPS', 'CONCATENADO' y 'BUSCA'.")

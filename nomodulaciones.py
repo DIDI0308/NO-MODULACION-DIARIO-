@@ -4,7 +4,7 @@ import pandas as pd
 st.set_page_config(page_title="Resumen General 3.30.8", layout="centered")
 
 st.title("📊 Resumen General por Fechas")
-st.write("Análisis de Modulación (DPS 88) de la hoja 3.30.8")
+st.write("Análisis de Modulación (DPS 88) - Hoja 3.30.8")
 
 uploaded_file = st.file_uploader("Sube tu archivo Excel", type=['xlsx'])
 
@@ -42,8 +42,8 @@ if uploaded_file is not None:
             })
         ).reset_index()
 
-        # --- NUEVA COLUMNA: % DE MODULACIÓN ---
-        # Evitamos división por cero con .where o simplemente asegurando que haya datos
+        # --- CÁLCULO DE PORCENTAJE ---
+        # Calculamos el % de Modulación (evitando división por cero)
         resumen['% Modulación'] = (resumen['Modulados'] / resumen['Total Concatenados']) * 100
 
         # Ordenar por fecha más reciente
@@ -52,9 +52,9 @@ if uploaded_file is not None:
         # --- VISUALIZACIÓN ---
         st.markdown("---")
         
-        st.subheader("Tabla Comparativa con Porcentajes")
+        st.subheader("Tabla de Cumplimiento")
         
-        # Formateo visual de la tabla
+        # Aplicar formato a la tabla
         st.dataframe(
             resumen.style.format({
                 'Fecha': lambda x: x.strftime('%d/%m/%Y'),
@@ -69,11 +69,11 @@ if uploaded_file is not None:
         # Botón para descargar el resumen completo
         csv = resumen.to_csv(index=False).encode('utf-8')
         st.download_button(
-            label="📥 Descargar esta tabla (CSV)",
+            label="📥 Descargar Reporte Consolidado (CSV)",
             data=csv,
-            file_name="resumen_modulacion_3308.csv",
+            file_name="reporte_modulacion_3308.csv",
             mime="text/csv",
         )
 
     except Exception as e:
-        st.error(f"Error: Asegúrate de que el archivo tenga las columnas 'Entrega', 'DPS', 'CONCATENADO' y 'BUSCA'.")
+        st.error(f"Error al procesar los datos. Verifique que las columnas existan.")

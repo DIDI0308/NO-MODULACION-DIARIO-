@@ -14,7 +14,7 @@ if uploaded_file is not None:
         # 1. Cargar datos (Hoja específica)
         df = pd.read_excel(uploaded_file, sheet_name="3.30.8")
         
-        # LIMPIEZA TOTAL DE COLUMNAS
+        # LIMPIEZA TOTAL DE COLUMNAS (Espacios ocultos)
         df.columns = df.columns.str.strip()
 
         # --- PROCESAMIENTO BASE ---
@@ -50,6 +50,7 @@ if uploaded_file is not None:
             df_g = df_base[df_base['Fecha'] > (ultima_fecha - pd.Timedelta(days=7)).date()]
             agrupar = 'Fecha'
         elif opcion_graf == "Mes Actual":
+            # Filtro Mes Actual: Desde el día 1 del mes de la última fecha hasta el final disponible
             df_g = df_base[(df_base['Entrega'].dt.month == ultima_fecha.month) & 
                            (df_base['Entrega'].dt.year == ultima_fecha.year)]
             agrupar = 'Fecha'
@@ -70,7 +71,7 @@ if uploaded_file is not None:
         fig.update_layout(yaxis=dict(range=[0, 115]), xaxis={'type': 'category'})
         st.plotly_chart(fig, use_container_width=True)
 
-        # --- SECCIÓN 2: CLIENTES NO MODULADOS ---
+        # --- SECCIÓN 2: CLIENTES ---
         st.markdown("---")
         st.header("DIARIO")
         st.subheader("NO MODULACIÓN")
@@ -84,61 +85,55 @@ if uploaded_file is not None:
 
             df_final_clientes = df_no_modulados[df_no_modulados['Fecha'] == fecha_sel].copy()
 
-            # Procesar columnas de texto
-            if 'Motivo' in df_final_clientes.columns:
-                df_final_clientes['Motivo'] = df_final_clientes['Motivo'].astype(str).replace(['nan', 'None'], 'Sin Motivo')
-            
-            # Asegurar que Client y F.Pedido se manejen como texto
+            # Asegurar formato texto para Client y F.Pedido
             df_final_clientes['Client'] = df_final_clientes['Client'].astype(str)
             df_final_clientes['F.Pedido'] = df_final_clientes['F.Pedido'].astype(str)
 
-            # Quitar repetidos por Client
+            if 'Motivo' in df_final_clientes.columns:
+                df_final_clientes['Motivo'] = df_final_clientes['Motivo'].astype(str).replace(['nan', 'None'], 'Sin Motivo')
+            
+            # Quitar repetidos por Client (solo el primero)
             resultado_tabla = df_final_clientes.drop_duplicates(subset=['Client'], keep='first')
             columnas_finales = ['Client', 'Cam', 'F.Pedido', 'Motivo']
             cols_ok = [c for c in columnas_finales if c in resultado_tabla.columns]
 
-            # --- DISEÑO ESTÉTICO SIN BORDES INTERNOS ---
+            # --- DISEÑO ESTÉTICO PERSONALIZADO (SIN BORDES) ---
             st.markdown("""
                 <style>
-                .tabla-moderna {
+                .main-table {
                     width: 100%;
                     border-collapse: collapse;
-                    margin: 20px 0;
-                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                    border-radius: 8px 8px 0 0;
-                    overflow: hidden;
+                    font-family: Arial, sans-serif;
+                    margin-top: 20px;
                 }
-                .tabla-moderna thead tr {
-                    background-color: #FFD700;
-                    color: #000000;
-                    text-align: center;
+                .main-table thead th {
+                    background-color: #FFD700 !important;
+                    color: black !important;
+                    text-align: center !important;
+                    padding: 12px;
                     font-weight: bold;
+                    border: none !important;
                 }
-                .tabla-moderna th, .tabla-moderna td {
-                    padding: 12px 15px;
-                    text-align: center;
-                    border: none; /* Sin bordes */
+                .main-table tbody td {
+                    text-align: center !important;
+                    padding: 10px;
+                    border: none !important;
+                    border-bottom: 1px solid #EEEEEE !important; /* Línea sutil horizontal */
                 }
-                .tabla-moderna tbody tr {
-                    border-bottom: 1px solid #f3f3f3;
-                }
-                .tabla-moderna tbody tr:nth-of-type(even) {
-                    background-color: #fafafa; /* Efecto cebreado suave */
-                }
-                .tabla-moderna tbody tr:last-of-type {
-                    border-bottom: 2px solid #FFD700;
+                .main-table tbody tr:nth-child(even) {
+                    background-color: #FAFAFA;
                 }
                 </style>
             """, unsafe_allow_html=True)
 
-            # Generar el HTML de la tabla
-            html_final = resultado_tabla[cols_ok].to_html(index=False, classes='tabla-moderna')
+            # Generar HTML
+            html_tabla = resultado_tabla[cols_ok].to_html(index=False, classes='main-table')
             
-            st.write(f"Resultados encontrados: **{len(resultado_tabla)}**")
-            st.markdown(html_final, unsafe_allow_html=True)
+            st.write(f"Clientes encontrados: **{len(resultado_tabla)}**")
+            st.markdown(html_tabla, unsafe_allow_html=True)
             
         else:
-            st.warning("No se encontraron registros de Clientes No Modulados.")
+            st.warning("No se encontraron registros de No Modulación.")
 
     except Exception as e:
         st.error(f"Error en el procesamiento: {e}")

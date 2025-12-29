@@ -93,26 +93,35 @@ if uploaded_file is not None:
             columnas_finales = ['Client', 'Cam', 'F.Pedido', 'Motivo']
             cols_ok = [c for c in columnas_finales if c in resultado_tabla.columns]
 
-            # --- APLICACIÓN DE ESTILOS FORZADOS ---
-            # Se usa HTML/CSS para garantizar el fondo amarillo, texto negro y centrado
-            st_styled = resultado_tabla[cols_ok].style.set_table_styles([
-                {'selector': 'th', 'props': [
-                    ('background-color', '#FFD700'), 
-                    ('color', 'black'), 
-                    ('text-align', 'center'),
-                    ('font-weight', 'bold'),
-                    ('padding', '10px')
-                ]},
-                {'selector': 'td', 'props': [
-                    ('text-align', 'center'),
-                    ('padding', '8px')
-                ]}
-            ]).hide(axis="index")
+            # --- ESTILO CSS PARA LA TABLA ---
+            # Forzamos celdas amarillas, texto negro y centrado
+            st.markdown("""
+                <style>
+                .custom-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    text-align: center;
+                }
+                .custom-table th {
+                    background-color: #FFD700 !important;
+                    color: black !important;
+                    font-weight: bold;
+                    padding: 10px;
+                    border: 1px solid #ddd;
+                }
+                .custom-table td {
+                    padding: 8px;
+                    border: 1px solid #ddd;
+                    text-align: center;
+                }
+                </style>
+            """, unsafe_allow_html=True)
 
-            st.write(f"Resultados encontrados para el día seleccionado: **{len(resultado_tabla)}**")
+            # Convertir DataFrame a HTML con la clase personalizada
+            tabla_html = resultado_tabla[cols_ok].to_html(classes='custom-table', index=False, escape=False)
             
-            # Usamos st.write + to_html para que Streamlit no ignore los estilos CSS
-            st.write(st_styled.to_html(), unsafe_allow_html=True)
+            st.write(f"Resultados encontrados: **{len(resultado_tabla)}**")
+            st.markdown(tabla_html, unsafe_allow_html=True)
             
         else:
             st.warning("No se encontraron registros de Clientes No Modulados.")

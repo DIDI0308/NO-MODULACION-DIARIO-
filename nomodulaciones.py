@@ -1,9 +1,9 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(page_title="Reporte 3.30.8", layout="wide")
+st.set_page_config(page_title="Dashboard Modulación 3.30.8", layout="wide")
 
-st.title("📊 Análisis de Modulación")
+st.title("📊 Análisis de Modulación por Periodos")
 
 uploaded_file = st.file_uploader("Sube tu archivo Excel", type=['xlsx'])
 
@@ -31,22 +31,22 @@ if uploaded_file is not None:
 
         df_base['es_modulado'] = df_base['BUSCA'].apply(es_valido)
 
-        # --- SELECTOR DE FILTRO ---
+        # --- FILTROS DE TIEMPO ---
         opcion = st.selectbox(
             "Selecciona el periodo de análisis:",
-            ["Últimos 7 días", "Mes Actual", "Promedio Mensual (Histórico)"]
+            ["Últimos 7 días", "Último Mes Calendario", "Promedio Mensual (Histórico)"]
         )
 
-        # Fecha de referencia (La última fecha que aparezca en el Excel)
+        # Referencia de tiempo basada en el archivo
         ultima_fecha = df_base['Entrega'].max()
         
         if opcion == "Últimos 7 días":
-            fecha_limite = (ultima_fecha - pd.Timedelta(days=7)).date()
-            df_final = df_base[df_base['Fecha'] > fecha_limite]
+            fecha_limite = ultima_fecha - pd.Timedelta(days=7)
+            df_final = df_base[df_base['Entrega'] > fecha_limite]
             agrupar_por = 'Fecha'
             
-        elif opcion == "Mes Actual":
-            # Filtra solo los días que pertenecen al mismo Mes y Año de la última fecha
+        elif opcion == "Último Mes Calendario":
+            # Filtra solo los días que pertenecen al mismo mes y año de la última fecha
             df_final = df_base[
                 (df_base['Entrega'].dt.month == ultima_fecha.month) & 
                 (df_base['Entrega'].dt.year == ultima_fecha.year)
@@ -81,7 +81,7 @@ if uploaded_file is not None:
         if agrupar_por == 'Fecha':
             formatos['Fecha'] = lambda x: x.strftime('%d/%m/%Y')
         else:
-            formatos[agrupar_por] = lambda x: str(x)
+            formatos['Periodo'] = lambda x: str(x)
 
         st.dataframe(
             resumen.style.format(formatos), 
@@ -90,4 +90,4 @@ if uploaded_file is not None:
         )
 
     except Exception as e:
-        st.error(f"Error al procesar: {e}")
+        st.error(f"Error: Asegúrate de que el archivo tenga las columnas requeridas.")

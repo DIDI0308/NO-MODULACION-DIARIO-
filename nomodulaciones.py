@@ -5,13 +5,13 @@ import plotly.express as px
 # Configuración de página
 st.set_page_config(page_title="Dashboard Modulación & Errores", layout="wide")
 
-st.title("📊 Análisis de Modulación y Reporte de Errores")
+st.title("Análisis de Modulación y Reporte de Errores")
 
 uploaded_file = st.file_uploader("Sube tu archivo Excel", type=['xlsx'])
 
 if uploaded_file is not None:
     try:
-        # 1. Cargar datos
+        # 1. Cargar datos (Hoja específica)
         df = pd.read_excel(uploaded_file, sheet_name="3.30.8")
 
         # --- PROCESAMIENTO BASE ---
@@ -22,6 +22,7 @@ if uploaded_file is not None:
         # Filtro base permanente: Solo DPS 88
         df_base = df[df['DPS'].astype(str).str.contains('88')].copy()
 
+        # Lógica de validación para BUSCA
         def es_valido(valor):
             if pd.isna(valor) or valor == "" or "error" in str(valor).lower() or "#" in str(valor):
                 return False
@@ -33,7 +34,7 @@ if uploaded_file is not None:
 
         df_base['es_modulado'] = df_base['BUSCA'].apply(es_valido)
 
-        # --- SECCIÓN 1: GRÁFICO DE MODULACIÓN ---
+        # --- SECCIÓN 1: GRÁFICO DE MODULACIÓN (OCULTANDO TABLA) ---
         st.markdown("### 📈 Evolución de Modulación")
         opcion_grafico = st.selectbox(
             "Selecciona el periodo para el gráfico:",
@@ -69,40 +70,40 @@ if uploaded_file is not None:
         fig.update_layout(yaxis=dict(range=[0, 115]), xaxis={'type': 'category'})
         st.plotly_chart(fig, use_container_width=True)
 
-        # --- SECCIÓN 2: TABLA DE ERRORES (BUSCA CON ERROR) ---
+        # --- SECCIÓN 2: TABLA DE ERRORES ---
         st.markdown("---")
-        st.markdown("### ⚠️ Reporte de Registros con Error")
+        st.markdown("### ⚠️ Reporte de Registros con Error (BUSCA No Válido)")
         
-        # Filtro 1: Solo los que tienen error en BUSCA (usamos la inversa de es_valido)
+        # Filtramos solo los que NO son modulados (Errores)
         df_errores = df_base[df_base['es_modulado'] == False].copy()
 
-        # Filtro 2: Selector visual de una fecha específica
-        fechas_disponibles = sorted(df_errores['Fecha'].unique(), reverse=True)
-        fecha_filtro = st.selectbox("Elige una fecha para ver los errores:", fechas_disponibles)
+        if not df_errores.empty:
+            # Selector de fecha específica
+            fechas_disponibles = sorted(df_errores['Fecha'].unique(), reverse=True)
+            fecha_filtro = st.selectbox("Elige una fecha para ver los detalles del error:", fechas_disponibles)
 
-        # Aplicar filtro de fecha
-        df_error_fecha = df_errores[df_errores['Fecha'] == fecha_filtro]
+            # Filtro por fecha seleccionada
+            df_error_fecha = df_errores[df_errores['Fecha'] == fecha_filtro].copy()
 
-        # Lógica: Sin repetidos según 'Client', solo el primero
-        # Seleccionamos solo las columnas pedidas
-        columnas_pedidas = ['Client', 'F.Pedido', 'Motivo']
-        
-        # Verificamos que las columnas existan antes de filtrar
-        columnas_existentes = [c for c in columnas_pedidas if c in df_error_fecha.columns]
-        
-        if not df_error_fecha.empty:
-            # Eliminamos duplicados por 'Client' manteniendo la primera aparición
-            resultado_errores = df_error_fecha.drop_duplicates(subset=['Client'], keep='first')
+            # Columnas requeridas
+            cols_deseadas = ['Client', 'F.Pedido', 'Motivo']
             
-            # Mostramos la tabla solo con las columnas deseadas
-            st.write(f"Mostrando {len(resultado_errores)} clientes únicos con error para el {fecha_filtro}:")
-            st.dataframe(resultado_errores[columnas_existentes], use_container_width=True, hide_index=True)
+            # Verificación de existencia de columnas y limpieza de 'Motivo'
+            cols_visibles = [c for c in cols_deseadas if c in df_error_fecha.columns]
             
-            # Botón de descarga para este reporte específico
-            csv = resultado_errores[columnas_existentes].to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Descargar Errores (CSV)", csv, f"errores_{fecha_filtro}.csv", "text/csv")
+            if 'Motivo' in df_error_fecha.columns:
+                # Convertimos Motivo a texto y rellenamos vacíos para que sea visible
+                df_error_fecha['Motivo'] = df_error_fecha['Motivo'].astype(str).replace('nan', 'Sin Motivo Especificado')
+
+            # Eliminar duplicados por Client, dejando el primero
+            resultado_final = df_error_fecha.drop_duplicates(subset=['Client'], keep='first')
+
+            st.write(f"Se encontraron **{len(resultado_final)}** casos únicos para la fecha seleccionada.")
+            
+            # Mostrar tabla final
+            st.dataframe(resultado_final[cols_visibles], use_container_width=True, hide_index=True)
         else:
-            st.success(f"No se encontraron errores para la fecha {fecha_filtro}.")
+            st.success("No se detectaron errores de búsqueda en el archivo cargado.")
 
     except Exception as e:
-        st.error(f"Error en el procesamiento: {e}")
+        st.error(f"Hubo un problema al procesar la hoja: {e}")

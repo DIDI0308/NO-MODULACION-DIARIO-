@@ -46,11 +46,11 @@ if uploaded_file is not None:
             agrupar_por = 'Fecha'
             
         elif opcion == "Mes Actual (Calendario)":
-            # Filtra solo los días que pertenecen al mismo Mes y Año de la última fecha
-            mes_actual = ultima_fecha.month
-            anio_actual = ultima_fecha.year
-            df_final = df_base[(df_base['Entrega'].dt.month == mes_actual) & 
-                               (df_base['Entrega'].dt.year == anio_actual)]
+            # FILTRO ESTRICTO: Solo filas del mismo mes y año que la última fecha
+            df_final = df_base[
+                (df_base['Entrega'].dt.month == ultima_fecha.month) & 
+                (df_base['Entrega'].dt.year == ultima_fecha.year)
+            ]
             agrupar_por = 'Fecha'
             
         else: # Promedio Mensual
@@ -71,8 +71,7 @@ if uploaded_file is not None:
 
         # --- VISUALIZACIÓN ---
         st.markdown("---")
-        nombre_mes = ultima_fecha.strftime('%B %Y') if opcion == "Mes Actual (Calendario)" else opcion
-        st.subheader(f"Vista: {nombre_mes}")
+        st.subheader(f"Vista: {opcion}")
         
         formatos = {
             'Total Concatenados': '{:,.0f}',
@@ -92,4 +91,4 @@ if uploaded_file is not None:
         )
 
     except Exception as e:
-        st.error(f"Error al procesar el archivo. Asegúrate de que las columnas sean correctas.")
+        st.error(f"Error al procesar el archivo.")

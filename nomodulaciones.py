@@ -5,6 +5,27 @@ import plotly.express as px
 # Configuración de página
 st.set_page_config(page_title="Reporte de modulación", layout="wide")
 
+# --- ESTILO CSS PARA LA TABLA ---
+# Esto fuerza a los encabezados a ser amarillos, texto negro y centrados
+st.markdown("""
+    <style>
+    /* Estilo para los encabezados de la tabla */
+    thead tr th {
+        background-color: #FFD700 !important;
+        color: black !important;
+        text-align: center !important;
+        font-weight: bold !important;
+    }
+    /* Estilo para centrar el contenido de las celdas */
+    [data-testid="stDataFrame"] div[role="gridcell"] {
+        text-align: center !important;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 st.title("ADH MODULACIÓN CD EA")
 
 uploaded_file = st.file_uploader("Sube tu archivo Excel", type=['xlsx'])
@@ -14,7 +35,7 @@ if uploaded_file is not None:
         # 1. Cargar datos (Hoja específica)
         df = pd.read_excel(uploaded_file, sheet_name="3.30.8")
         
-        # LIMPIEZA TOTAL DE COLUMNAS (Elimina espacios ocultos en "Motivo    ", "Cam", etc.)
+        # LIMPIEZA TOTAL DE COLUMNAS
         df.columns = df.columns.str.strip()
 
         # --- PROCESAMIENTO BASE ---
@@ -25,7 +46,6 @@ if uploaded_file is not None:
         # Filtro base permanente: Solo DPS 88
         df_base = df[df['DPS'].astype(str).str.contains('88')].copy()
 
-        # Lógica de validación para columna BUSCA
         def es_valido(valor):
             if pd.isna(valor) or valor == "" or "error" in str(valor).lower() or "#" in str(valor):
                 return False
@@ -70,39 +90,37 @@ if uploaded_file is not None:
         fig.update_layout(yaxis=dict(range=[0, 115]), xaxis={'type': 'category'})
         st.plotly_chart(fig, use_container_width=True)
 
-        # --- SECCIÓN 2: CLIENTES ---
+        # --- SECCIÓN 2: DIARIO NO MODULACIÓN ---
         st.markdown("---")
         st.header("DIARIO")
         st.subheader("NO MODULACIÓN")
         
-        # Filtramos los NO modulados
         df_no_modulados = df_base[df_base['es_modulado'] == False].copy()
 
         if not df_no_modulados.empty:
-            # Selector de fecha
             fechas_disponibles = sorted(df_no_modulados['Fecha'].unique(), reverse=True)
             fecha_sel = st.selectbox("Filtrar por fecha específica:", fechas_disponibles)
 
-            # Filtro por fecha seleccionada
             df_final_clientes = df_no_modulados[df_no_modulados['Fecha'] == fecha_sel].copy()
 
-            # Forzar la existencia de la columna Motivo y tratarla como texto
             if 'Motivo' in df_final_clientes.columns:
                 df_final_clientes['Motivo'] = df_final_clientes['Motivo'].astype(str).replace(['nan', 'None'], 'Sin Motivo')
             else:
                 df_final_clientes['Motivo'] = "Columna no encontrada"
 
-            # Sin repetidos según 'Client', manteniendo solo el primero
             resultado_tabla = df_final_clientes.drop_duplicates(subset=['Client'], keep='first')
 
-            # Columnas estrictamente solicitadas en el orden pedido
             columnas_finales = ['Client', 'Cam', 'F.Pedido', 'Motivo']
-            
-            # Aseguramos que solo se intenten mostrar las que existen en el DataFrame
             cols_ok = [c for c in columnas_finales if c in resultado_tabla.columns]
 
             st.write(f"Resultados encontrados para el día seleccionado: **{len(resultado_tabla)}**")
-            st.dataframe(resultado_tabla[cols_ok], use_container_width=True, hide_index=True)
+            
+            # Usamos dataframe con el CSS inyectado arriba
+            st.dataframe(
+                resultado_tabla[cols_ok], 
+                use_container_width=True, 
+                hide_index=True
+            )
         else:
             st.warning("No se encontraron registros de Clientes No Modulados.")
 

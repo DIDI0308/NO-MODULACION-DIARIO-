@@ -14,7 +14,7 @@ if uploaded_file is not None:
         # 1. Cargar datos (Hoja específica)
         df = pd.read_excel(uploaded_file, sheet_name="3.30.8")
         
-        # LIMPIEZA TOTAL DE COLUMNAS (Elimina espacios ocultos en "Motivo    ", "Cam", etc.)
+        # LIMPIEZA TOTAL DE COLUMNAS
         df.columns = df.columns.str.strip()
 
         # --- PROCESAMIENTO BASE ---
@@ -84,47 +84,55 @@ if uploaded_file is not None:
 
             df_final_clientes = df_no_modulados[df_no_modulados['Fecha'] == fecha_sel].copy()
 
-            # Procesar columna Motivo
+            # Procesar columnas de texto
             if 'Motivo' in df_final_clientes.columns:
                 df_final_clientes['Motivo'] = df_final_clientes['Motivo'].astype(str).replace(['nan', 'None'], 'Sin Motivo')
-            else:
-                df_final_clientes['Motivo'] = "Columna no encontrada"
+            
+            # Asegurar que Client y F.Pedido se manejen como texto
+            df_final_clientes['Client'] = df_final_clientes['Client'].astype(str)
+            df_final_clientes['F.Pedido'] = df_final_clientes['F.Pedido'].astype(str)
 
             # Quitar repetidos por Client
             resultado_tabla = df_final_clientes.drop_duplicates(subset=['Client'], keep='first')
             columnas_finales = ['Client', 'Cam', 'F.Pedido', 'Motivo']
             cols_ok = [c for c in columnas_finales if c in resultado_tabla.columns]
 
-            # --- APLICACIÓN DE FORMATO ESTRICTO ---
+            # --- DISEÑO ESTÉTICO SIN BORDES INTERNOS ---
             st.markdown("""
                 <style>
-                .tabla-estilizada {
+                .tabla-moderna {
                     width: 100%;
                     border-collapse: collapse;
-                    margin: 25px 0;
-                    font-size: 0.9em;
-                    font-family: sans-serif;
-                    box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+                    margin: 20px 0;
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    border-radius: 8px 8px 0 0;
+                    overflow: hidden;
                 }
-                .tabla-estilizada th {
-                    background-color: #FFD700 !important;
-                    color: #000000 !important;
-                    text-align: center !important;
-                    padding: 12px 15px;
-                    border: 1px solid #000000 !important;
+                .tabla-moderna thead tr {
+                    background-color: #FFD700;
+                    color: #000000;
+                    text-align: center;
                     font-weight: bold;
                 }
-                .tabla-estilizada td {
+                .tabla-moderna th, .tabla-moderna td {
                     padding: 12px 15px;
-                    text-align: center !important;
-                    border: 1px solid #000000 !important;
-                    background-color: #ffffff;
+                    text-align: center;
+                    border: none; /* Sin bordes */
+                }
+                .tabla-moderna tbody tr {
+                    border-bottom: 1px solid #f3f3f3;
+                }
+                .tabla-moderna tbody tr:nth-of-type(even) {
+                    background-color: #fafafa; /* Efecto cebreado suave */
+                }
+                .tabla-moderna tbody tr:last-of-type {
+                    border-bottom: 2px solid #FFD700;
                 }
                 </style>
             """, unsafe_allow_html=True)
 
             # Generar el HTML de la tabla
-            html_final = resultado_tabla[cols_ok].to_html(index=False, classes='tabla-estilizada')
+            html_final = resultado_tabla[cols_ok].to_html(index=False, classes='tabla-moderna')
             
             st.write(f"Resultados encontrados: **{len(resultado_tabla)}**")
             st.markdown(html_final, unsafe_allow_html=True)

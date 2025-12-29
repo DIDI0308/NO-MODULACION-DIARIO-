@@ -14,7 +14,7 @@ if uploaded_file is not None:
         # 1. Cargar datos (Hoja específica)
         df = pd.read_excel(uploaded_file, sheet_name="3.30.8")
         
-        # LIMPIEZA TOTAL DE COLUMNAS (Elimina espacios ocultos)
+        # LIMPIEZA TOTAL DE COLUMNAS (Elimina espacios ocultos en "Motivo    ", "Cam", etc.)
         df.columns = df.columns.str.strip()
 
         # --- PROCESAMIENTO BASE ---
@@ -70,7 +70,7 @@ if uploaded_file is not None:
         fig.update_layout(yaxis=dict(range=[0, 115]), xaxis={'type': 'category'})
         st.plotly_chart(fig, use_container_width=True)
 
-        # --- SECCIÓN 2: CLIENTES ---
+        # --- SECCIÓN 2: CLIENTES NO MODULADOS ---
         st.markdown("---")
         st.header("DIARIO")
         st.subheader("NO MODULACIÓN")
@@ -84,54 +84,50 @@ if uploaded_file is not None:
 
             df_final_clientes = df_no_modulados[df_no_modulados['Fecha'] == fecha_sel].copy()
 
+            # Procesar columna Motivo
             if 'Motivo' in df_final_clientes.columns:
                 df_final_clientes['Motivo'] = df_final_clientes['Motivo'].astype(str).replace(['nan', 'None'], 'Sin Motivo')
             else:
                 df_final_clientes['Motivo'] = "Columna no encontrada"
 
-            # Sin repetidos según 'Client'
+            # Quitar repetidos por Client
             resultado_tabla = df_final_clientes.drop_duplicates(subset=['Client'], keep='first')
             columnas_finales = ['Client', 'Cam', 'F.Pedido', 'Motivo']
             cols_ok = [c for c in columnas_finales if c in resultado_tabla.columns]
 
-            # --- DISEÑO DE TABLA CON FORMATO FORZADO ---
-            # Inyectamos CSS para bordes, colores y centrado
+            # --- APLICACIÓN DE FORMATO ESTRICTO ---
             st.markdown("""
                 <style>
-                .tabla-contenedor {
-                    display: flex;
-                    justify-content: center;
-                    margin: 20px 0;
-                }
-                table.dataframe-custom {
+                .tabla-estilizada {
                     width: 100%;
-                    border: 1px solid black;
                     border-collapse: collapse;
+                    margin: 25px 0;
+                    font-size: 0.9em;
+                    font-family: sans-serif;
+                    box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
                 }
-                table.dataframe-custom th {
+                .tabla-estilizada th {
                     background-color: #FFD700 !important;
-                    color: black !important;
-                    border: 1px solid black !important;
+                    color: #000000 !important;
                     text-align: center !important;
-                    padding: 12px;
-                    font-size: 16px;
+                    padding: 12px 15px;
+                    border: 1px solid #000000 !important;
+                    font-weight: bold;
                 }
-                table.dataframe-custom td {
-                    border: 1px solid black !important;
+                .tabla-estilizada td {
+                    padding: 12px 15px;
                     text-align: center !important;
-                    padding: 10px;
-                    background-color: white;
-                    color: black;
+                    border: 1px solid #000000 !important;
+                    background-color: #ffffff;
                 }
                 </style>
             """, unsafe_allow_html=True)
 
-            # Generar HTML de la tabla con la clase CSS aplicada
-            html_tabla = resultado_tabla[cols_ok].to_html(index=False, classes='dataframe-custom')
+            # Generar el HTML de la tabla
+            html_final = resultado_tabla[cols_ok].to_html(index=False, classes='tabla-estilizada')
             
             st.write(f"Resultados encontrados: **{len(resultado_tabla)}**")
-            # Mostrar la tabla HTML
-            st.markdown(html_tabla, unsafe_allow_html=True)
+            st.markdown(html_final, unsafe_allow_html=True)
             
         else:
             st.warning("No se encontraron registros de Clientes No Modulados.")

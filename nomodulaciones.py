@@ -49,7 +49,7 @@ if uploaded_file is not None:
         # Filtro DPS 88
         df_base = df[df['DPS'].astype(str).str.contains('88')].copy()
 
-        # Función para detectar validez en BUSCA (Detecta #N/D, errores, vacíos)
+        # Función para detectar validez en BUSCA
         def es_valido(valor):
             if pd.isna(valor) or valor == "" or "error" in str(valor).lower() or "#" in str(valor):
                 return False
@@ -93,7 +93,7 @@ if uploaded_file is not None:
             fecha_sel = st.selectbox("Filtrar por fecha:", sorted(df_no_mod['Fecha'].unique(), reverse=True))
             df_f = df_no_mod[df_no_mod['Fecha'] == fecha_sel].copy()
 
-            # Conversión forzada a string limpio para Client
+            # Limpieza de Client y F.Pedido para visualización
             for col in ['Client', 'F.Pedido']:
                 if col in df_f.columns:
                     df_f[col] = df_f[col].apply(lambda x: str(int(float(x))) if pd.notna(x) and str(x).replace('.','').isdigit() else str(x))
@@ -112,79 +112,79 @@ if uploaded_file is not None:
         else:
             st.warning("No hay datos para Clientes No Modulados.")
 
-        # --- SECCIÓN 3: REINCIDENCIAS (NUEVO) ---
+        # --- SECCIÓN 3: REINCIDENCIAS (ACTUALIZADA) ---
         st.markdown("---")
         st.header("REINCIDENCIAS")
-        st.subheader("Clientes más reincidentes (#N/D)")
+        st.subheader("Top 10 Clientes más reincidentes")
 
-        # Usamos df_no_mod que ya tiene: DPS=88 y BUSCA con error/#N/D
         if not df_no_mod.empty:
             col_filt_re, col_blank = st.columns([1, 3])
             with col_filt_re:
                 opcion_reincidencia = st.selectbox("Periodo Reincidencia:", ["Últimos 7 días", "Mes Actual", "Último Año"])
             
             df_re = df_no_mod.copy()
-            # Aseguramos limpieza del nombre del cliente para agrupar bien
+            # Limpiamos columna Client para asegurar que sean códigos de texto
             df_re['Client'] = df_re['Client'].apply(lambda x: str(int(float(x))) if pd.notna(x) and str(x).replace('.','').isdigit() else str(x))
 
             top_clientes = pd.DataFrame()
-            y_axis_label = "Cantidad de Errores"
+            y_axis_label = "Veces"
 
+            # Lógica de cálculo según periodo
             if opcion_reincidencia == "Últimos 7 días":
                 fecha_limite = ultima_fecha - pd.Timedelta(days=7)
                 df_re_filt = df_re[df_re['Entrega'] > fecha_limite]
-                # Conteo simple
                 top_clientes = df_re_filt['Client'].value_counts().reset_index()
                 top_clientes.columns = ['Client', 'Cantidad']
-                y_axis_label = "Cantidad"
+                y_axis_label = "Veces Reincidente"
 
             elif opcion_reincidencia == "Mes Actual":
                 df_re_filt = df_re[
                     (df_re['Entrega'].dt.month == ultima_fecha.month) & 
                     (df_re['Entrega'].dt.year == ultima_fecha.year)
                 ]
-                # Conteo simple
                 top_clientes = df_re_filt['Client'].value_counts().reset_index()
                 top_clientes.columns = ['Client', 'Cantidad']
-                y_axis_label = "Cantidad"
+                y_axis_label = "Veces Reincidente"
 
-            else: # Último Año (Promedio por mes)
+            else: # Último Año (Promedio Mensual como solicitaste antes)
                 fecha_limite = ultima_fecha - pd.DateOffset(years=1)
                 df_re_filt = df_re[df_re['Entrega'] > fecha_limite].copy()
-                
-                # Creamos columna mes-año para agrupar
                 df_re_filt['Mes_Anio'] = df_re_filt['Entrega'].dt.to_period('M')
                 
-                # 1. Contamos errores por cliente y por mes
                 conteo_mensual = df_re_filt.groupby(['Client', 'Mes_Anio']).size().reset_index(name='Conteo')
-                
-                # 2. Sacamos el promedio de esos conteos mensuales
                 top_clientes = conteo_mensual.groupby('Client')['Conteo'].mean().reset_index()
                 top_clientes.columns = ['Client', 'Promedio']
-                y_axis_label = "Promedio Mensual"
+                y_axis_label = "Promedio de Veces (Mensual)"
 
-            # Ordenar y tomar Top 15 para que la gráfica no se sature
+            # --- FILTRADO TOP 10 Y GRÁFICO ---
             if not top_clientes.empty:
                 col_val = top_clientes.columns[1] # 'Cantidad' o 'Promedio'
-                top_clientes = top_clientes.sort_values(by=col_val, ascending=False).head(15)
+                
+                # ORDENAR Y TOMAR SOLO LOS 10 PRIMEROS
+                top_clientes = top_clientes.sort_values(by=col_val, ascending=False).head(10)
 
                 fig_re = px.bar(
                     top_clientes, 
                     x='Client', 
                     y=col_val, 
                     text=col_val, 
-                    title=f"Top 15 Clientes Reincidentes - {opcion_reincidencia}",
-                    color_discrete_sequence=['#FFD700'] # Amarillo
+                    title=f"Top 10 Clientes Reincidentes ({opcion_reincidencia})",
+                    color_discrete_sequence=['#FFD700']
                 )
                 
-                fig_re.update_layout(xaxis_title="Cliente", yaxis_title=y_axis_label)
-                # Formato del texto (si es promedio usa decimales, si es cantidad enteros)
-                formato = '.1f' if opcion_reincidencia == "Último Año" else 'd'
+                fig_re.update_layout(
+                    xaxis_title="Código Cliente", 
+                    yaxis_title=y_axis_label,
+                    xaxis=dict(type='category') # Fuerza a que el eje X trate los códigos como categorías discretas
+                )
+                
+                # Formato del texto (enteros para conteo simple, decimal para promedio)
+                formato = '.1f' if col_val == 'Promedio' else 'd'
                 fig_re.update_traces(texttemplate=f'%{{text:{formato}}}', textposition='outside')
                 
                 st.plotly_chart(fig_re, use_container_width=True)
             else:
-                st.info("No hay reincidencias en el periodo seleccionado.")
+                st.info("No se encontraron reincidencias en el periodo seleccionado.")
 
     except Exception as e:
         st.error(f"Error procesando el archivo: {e}")

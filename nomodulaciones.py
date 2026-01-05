@@ -187,8 +187,8 @@ if uploaded_file is not None:
         # SECCIÓN 3: REINCIDENCIAS CLIENTES
         # ==========================================
         st.markdown("---")
-        st.header("REINCIDENCIAS - CLIENTES")
-        st.subheader("Top 10 Clientes más reincidentes (Días únicos)")
+        st.header("REINCIDENCIAS")
+        st.subheader("Top 10 Clientes más reincidentes")
 
         if not df_no_mod.empty:
             col_filt_re, col_blank = st.columns([1, 3])
@@ -236,8 +236,7 @@ if uploaded_file is not None:
         # SECCIÓN 4: REINCIDENCIAS CAMIONES (NUEVO)
         # ==========================================
         st.markdown("---")
-        st.header("REINCIDENCIAS - CAMIONES")
-        st.subheader("Top 10 Camiones con más incidencias (Días únicos)")
+        st.subheader("Top 10 Camiones con más incidencias")
 
         if not df_no_mod.empty:
             col_filt_cam, col_blank_cam = st.columns([1, 3])

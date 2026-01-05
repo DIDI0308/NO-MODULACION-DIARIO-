@@ -93,7 +93,7 @@ if uploaded_file is not None:
             fecha_sel = st.selectbox("Filtrar por fecha:", sorted(df_no_mod['Fecha'].unique(), reverse=True))
             df_f = df_no_mod[df_no_mod['Fecha'] == fecha_sel].copy()
 
-            # Limpieza de Client y F.Pedido para visualización
+            # Limpieza de Client y F.Pedido
             for col in ['Client', 'F.Pedido']:
                 if col in df_f.columns:
                     df_f[col] = df_f[col].apply(lambda x: str(int(float(x))) if pd.notna(x) and str(x).replace('.','').isdigit() else str(x))
@@ -112,10 +112,10 @@ if uploaded_file is not None:
         else:
             st.warning("No hay datos para Clientes No Modulados.")
 
-        # --- SECCIÓN 3: REINCIDENCIAS (ACTUALIZADA) ---
+        # --- SECCIÓN 3: REINCIDENCIAS (CORREGIDA) ---
         st.markdown("---")
         st.header("REINCIDENCIAS")
-        st.subheader("Top 10 Clientes más reincidentes")
+        st.subheader("Top 10 Clientes más reincidentes (Días únicos)")
 
         if not df_no_mod.empty:
             col_filt_re, col_blank = st.columns([1, 3])
@@ -123,64 +123,55 @@ if uploaded_file is not None:
                 opcion_reincidencia = st.selectbox("Periodo Reincidencia:", ["Últimos 7 días", "Mes Actual", "Último Año"])
             
             df_re = df_no_mod.copy()
-            # Limpiamos columna Client para asegurar que sean códigos de texto
+            # Limpieza de código de cliente
             df_re['Client'] = df_re['Client'].apply(lambda x: str(int(float(x))) if pd.notna(x) and str(x).replace('.','').isdigit() else str(x))
+            
+            # --- LÓGICA CLAVE: ELIMINAR DUPLICADOS DE FECHA POR CLIENTE ---
+            # Si un cliente aparece 5 veces el mismo día, solo contamos 1 vez ese día.
+            df_re_unicos = df_re.drop_duplicates(subset=['Client', 'Fecha'])
 
             top_clientes = pd.DataFrame()
-            y_axis_label = "Veces"
 
-            # Lógica de cálculo según periodo
+            # Filtros de Tiempo sobre la data única
             if opcion_reincidencia == "Últimos 7 días":
                 fecha_limite = ultima_fecha - pd.Timedelta(days=7)
-                df_re_filt = df_re[df_re['Entrega'] > fecha_limite]
-                top_clientes = df_re_filt['Client'].value_counts().reset_index()
-                top_clientes.columns = ['Client', 'Cantidad']
-                y_axis_label = "Veces Reincidente"
-
+                df_re_filt = df_re_unicos[df_re_unicos['Entrega'] > fecha_limite]
+                
             elif opcion_reincidencia == "Mes Actual":
-                df_re_filt = df_re[
-                    (df_re['Entrega'].dt.month == ultima_fecha.month) & 
-                    (df_re['Entrega'].dt.year == ultima_fecha.year)
+                df_re_filt = df_re_unicos[
+                    (df_re_unicos['Entrega'].dt.month == ultima_fecha.month) & 
+                    (df_re_unicos['Entrega'].dt.year == ultima_fecha.year)
                 ]
+                
+            else: # Último Año
+                fecha_limite = ultima_fecha - pd.DateOffset(years=1)
+                df_re_filt = df_re_unicos[df_re_unicos['Entrega'] > fecha_limite]
+
+            # Conteo simple (ahora "Último Año" también es conteo total, no promedio)
+            if not df_re_filt.empty:
                 top_clientes = df_re_filt['Client'].value_counts().reset_index()
                 top_clientes.columns = ['Client', 'Cantidad']
-                y_axis_label = "Veces Reincidente"
-
-            else: # Último Año (Promedio Mensual como solicitaste antes)
-                fecha_limite = ultima_fecha - pd.DateOffset(years=1)
-                df_re_filt = df_re[df_re['Entrega'] > fecha_limite].copy()
-                df_re_filt['Mes_Anio'] = df_re_filt['Entrega'].dt.to_period('M')
                 
-                conteo_mensual = df_re_filt.groupby(['Client', 'Mes_Anio']).size().reset_index(name='Conteo')
-                top_clientes = conteo_mensual.groupby('Client')['Conteo'].mean().reset_index()
-                top_clientes.columns = ['Client', 'Promedio']
-                y_axis_label = "Promedio de Veces (Mensual)"
-
-            # --- FILTRADO TOP 10 Y GRÁFICO ---
-            if not top_clientes.empty:
-                col_val = top_clientes.columns[1] # 'Cantidad' o 'Promedio'
-                
-                # ORDENAR Y TOMAR SOLO LOS 10 PRIMEROS
-                top_clientes = top_clientes.sort_values(by=col_val, ascending=False).head(10)
+                # Ordenar y tomar Top 10
+                top_clientes = top_clientes.sort_values(by='Cantidad', ascending=False).head(10)
 
                 fig_re = px.bar(
                     top_clientes, 
                     x='Client', 
-                    y=col_val, 
-                    text=col_val, 
+                    y='Cantidad', 
+                    text='Cantidad', 
                     title=f"Top 10 Clientes Reincidentes ({opcion_reincidencia})",
                     color_discrete_sequence=['#FFD700']
                 )
                 
                 fig_re.update_layout(
                     xaxis_title="Código Cliente", 
-                    yaxis_title=y_axis_label,
-                    xaxis=dict(type='category') # Fuerza a que el eje X trate los códigos como categorías discretas
+                    yaxis_title="Días con Incidencia",
+                    xaxis=dict(type='category') # Eje X como categoría
                 )
                 
-                # Formato del texto (enteros para conteo simple, decimal para promedio)
-                formato = '.1f' if col_val == 'Promedio' else 'd'
-                fig_re.update_traces(texttemplate=f'%{{text:{formato}}}', textposition='outside')
+                # Formato entero siempre
+                fig_re.update_traces(texttemplate='%{text}', textposition='outside')
                 
                 st.plotly_chart(fig_re, use_container_width=True)
             else:

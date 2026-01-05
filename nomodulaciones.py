@@ -6,9 +6,7 @@ import plotly.express as px
 st.set_page_config(page_title="Reporte de modulación", layout="wide")
 
 # --- DEFINICIÓN DE ICONOS SVG (RUTAS EXACTAS) ---
-# Icono Persona (FontAwesome User)
 SVG_PERSONA = "M256 0c70.7 0 128 57.3 128 128s-57.3 128-128 128S0 198.7 0 128 57.3 0 128 0zm0 304c118.6 0 222.5 58.5 269.3 143 7.9 14.2 1.7 32.1-13.7 39.7-6.9 3.4-14.5 5.1-22 5.1-8.1 0-16.3-2-23.6-6.1-34.8-19.7-74.8-30.7-117-30.7-41.8 0-81.4 10.8-116.2 30.3-14.8 8.3-33.7 2.9-42.2-11.7-8.4-14.6-3.4-33.6 11.3-42.1C112.6 347.1 181.7 304 256 304z"
-# Icono Camión (FontAwesome Truck)
 SVG_CAMION = "M624 352h-16V243.9c0-12.7-5.1-24.9-14.1-33.9L494 110.1c-9-9-21.2-14.1-33.9-14.1H416V48c0-26.5-21.5-48-48-48H48C21.5 0 0 21.5 0 48v320c0 26.5 21.5 48 48 48h16c0 53 43 96 96 96s96-43 96-96h128c0 53 43 96 96 96s96-43 96-96h48c26.5 0 48-21.5 48-48v-64c0-26.5-21.5-48-48-48zm-16-224h-64V64h64v64zm48 224c-26.5 0-48 21.5-48 48s21.5 48 48 48 48-21.5 48-48-21.5-48-48-48zm-496 0c-26.5 0-48 21.5-48 48s21.5 48 48 48 48-21.5 48-48-21.5-48-48-48zm368 0H192v-32h272v32z"
 
 # --- INYECCIÓN DE CSS (ESTILOS VISUALES) ---
@@ -44,7 +42,7 @@ st.markdown("""
     /* Estilos para Plotly estándar */
     div[data-testid="stPlotlyChart"] { background-color: white; border-radius: 20px; overflow: hidden; padding: 10px; box-shadow: 0 4px 8px rgba(255, 215, 0, 0.1); }
 
-    /* --- NUEVOS ESTILOS PARA LOS ISOTIPOS (Iconos que se llenan) --- */
+    /* --- ESTILOS PARA LOS ISOTIPOS --- */
     .isotype-row {
         display: flex;
         align-items: center;
@@ -53,7 +51,7 @@ st.markdown("""
         padding-bottom: 10px;
     }
     .isotype-label {
-        flex: 0 0 100px; /* Ancho fijo para el código del cliente */
+        flex: 0 0 100px; /* Ancho fijo para el código */
         font-weight: bold;
         color: black;
         font-size: 1.1em;
@@ -64,26 +62,27 @@ st.markdown("""
         height: 60px;
         margin-right: 20px;
     }
-    /* El icono de fondo (Gris) */
+    /* Icono Fondo (Gris) */
     .icon-bg {
         position: absolute;
         top: 0; left: 0;
         width: 60px; height: 60px;
         fill: #e0e0e0;
     }
-    /* El contenedor que recorta (Clipper) */
+    /* Contenedor Recorte */
     .icon-fill-container {
         position: absolute;
         top: 0; left: 0;
         height: 60px;
-        overflow: hidden; /* IMPORTANTE: Esto recorta el icono amarillo */
+        overflow: hidden;
         z-index: 10;
+        transition: width 0.5s ease;
     }
-    /* El icono de frente (Amarillo) */
+    /* Icono Frente (Amarillo) */
     .icon-fg {
         position: absolute;
         top: 0; left: 0;
-        width: 60px; /* Ancho fijo igual al wrapper para no deformarse */
+        width: 60px; 
         height: 60px; 
         fill: #FFD700;
     }
@@ -96,47 +95,39 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- FUNCIÓN GENERADORA DE HTML ---
+# --- FUNCIÓN GENERADORA DE HTML CORREGIDA (SIN ESPACIOS) ---
 def generar_html_isotipo(df_top, col_id, col_valor, svg_path, viewBox_cfg):
     """
     Genera el bloque HTML completo para la lista de isotipos.
+    IMPORTANTE: El HTML no tiene identación para evitar errores de Markdown.
     """
     if df_top.empty:
         return "<div class='white-card-container'>No hay datos.</div>"
     
     max_valor = df_top[col_valor].max()
     
-    # Abrimos el contenedor blanco
+    # Inicio del contenedor
     html_output = "<div class='white-card-container'>"
     
     for index, row in df_top.iterrows():
         codigo = row[col_id]
         valor = row[col_valor]
-        # Calculamos porcentaje (evitando división por cero)
         porcentaje = (valor / max_valor * 100) if max_valor > 0 else 0
         
-        # Construcción minuciosa del HTML para cada fila
+        # HTML MINIFICADO (Sin espacios al inicio de las líneas)
         html_output += f"""
-        <div class="isotype-row">
-            <div class="isotype-label">{codigo}</div>
-            
-            <div class="icon-wrapper">
-                <svg class="icon-bg" viewBox="{viewBox_cfg}" xmlns="http://www.w3.org/2000/svg">
-                    <path d="{svg_path}"/>
-                </svg>
-                
-                <div class="icon-fill-container" style="width: {porcentaje}%;">
-                    <svg class="icon-fg" viewBox="{viewBox_cfg}" xmlns="http://www.w3.org/2000/svg">
-                        <path d="{svg_path}"/>
-                    </svg>
-                </div>
-            </div>
-            
-            <div class="isotype-value">{valor}</div>
-        </div>
-        """
+<div class="isotype-row">
+<div class="isotype-label">{codigo}</div>
+<div class="icon-wrapper">
+<svg class="icon-bg" viewBox="{viewBox_cfg}" xmlns="http://www.w3.org/2000/svg"><path d="{svg_path}"/></svg>
+<div class="icon-fill-container" style="width: {porcentaje}%;">
+<svg class="icon-fg" viewBox="{viewBox_cfg}" xmlns="http://www.w3.org/2000/svg"><path d="{svg_path}"/></svg>
+</div>
+</div>
+<div class="isotype-value">{valor}</div>
+</div>"""
     
-    html_output += "</div>" # Cerramos el contenedor blanco
+    html_output += "</div>"
     return html_output
 
 # ==============================================================================
@@ -224,17 +215,16 @@ if uploaded_file is not None:
             cols = [c for c in ['Client', 'Cam', 'F.Pedido', 'Motivo'] if c in resultado.columns]
 
             html_tabla = f"""
-            <div class="white-card-container">
-                <h4 style="color:black !important; margin-top:0;">Clientes encontrados: {len(resultado)}</h4>
-                {resultado[cols].to_html(index=False, classes='tabla-final')}
-            </div>
-            """
+<div class="white-card-container">
+<h4 style="color:black !important; margin-top:0;">Clientes encontrados: {len(resultado)}</h4>
+{resultado[cols].to_html(index=False, classes='tabla-final')}
+</div>"""
             st.markdown(html_tabla, unsafe_allow_html=True)
         else:
             st.warning("No hay datos para Clientes No Modulados.")
 
         # ==========================================
-        # SECCIÓN 3: REINCIDENCIAS CLIENTES (ISOTIPO)
+        # SECCIÓN 3: REINCIDENCIAS CLIENTES
         # ==========================================
         st.markdown("---")
         st.header("REINCIDENCIAS - CLIENTES")
@@ -263,9 +253,7 @@ if uploaded_file is not None:
                 top.columns = ['Client', 'Cantidad']
                 top = top.sort_values(by='Cantidad', ascending=False).head(10)
                 
-                # --- AQUÍ ES DONDE OCURRE LA MAGIA ---
-                # Generamos el HTML y usamos st.markdown con unsafe_allow_html=True
-                # SVG PERSONA: viewbox 0 0 512 512
+                # HTML SVG PERSONA
                 html_clientes = generar_html_isotipo(top, 'Client', 'Cantidad', SVG_PERSONA, "0 0 512 512")
                 st.markdown(html_clientes, unsafe_allow_html=True) 
                 
@@ -273,7 +261,7 @@ if uploaded_file is not None:
                 st.info("No se encontraron datos.")
 
         # ==========================================
-        # SECCIÓN 4: REINCIDENCIAS CAMIONES (ISOTIPO)
+        # SECCIÓN 4: REINCIDENCIAS CAMIONES
         # ==========================================
         st.markdown("---")
         st.header("REINCIDENCIAS - CAMIONES")
@@ -303,8 +291,7 @@ if uploaded_file is not None:
                     top_cam.columns = ['Cam', 'Cantidad']
                     top_cam = top_cam.sort_values(by='Cantidad', ascending=False).head(10)
 
-                    # --- AQUÍ TAMBIÉN ---
-                    # SVG CAMIÓN: viewbox 0 0 640 512
+                    # HTML SVG CAMION
                     html_camiones = generar_html_isotipo(top_cam, 'Cam', 'Cantidad', SVG_CAMION, "0 0 640 512")
                     st.markdown(html_camiones, unsafe_allow_html=True)
                     

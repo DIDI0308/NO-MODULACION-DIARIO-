@@ -6,9 +6,7 @@ import plotly.express as px
 st.set_page_config(page_title="Reporte de modulación", layout="wide")
 
 # --- DEFINICIÓN DE ICONOS SVG (SIMPLIFICADOS) ---
-# Icono Persona (Silueta clásica sólida)
 SVG_PERSONA = "M224 256c70.7 0 128-57.3 128-128S294.7 0 224 0 96 57.3 96 128s57.3 128 128 128zm89.6 32h-16.7c-22.2 10.2-46.9 16-72.9 16s-50.6-5.8-72.9-16h-16.7C60.2 288 0 348.2 0 422.4V464c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48v-41.6c0-74.2-60.2-134.4-134.4-134.4z"
-# Icono Camión (Vista lateral sólida)
 SVG_CAMION = "M624 352h-16V243.9c0-12.7-5.1-24.9-14.1-33.9L494 110.1c-9-9-21.2-14.1-33.9-14.1H416V48c0-26.5-21.5-48-48-48H48C21.5 0 0 21.5 0 48v320c0 26.5 21.5 48 48 48h16c0 53 43 96 96 96s96-43 96-96h128c0 53 43 96 96 96s96-43 96-96h48c26.5 0 48-21.5 48-48v-64c0-26.5-21.5-48-48-48zm-16-224h-64V64h64v64zm48 224c-26.5 0-48 21.5-48 48s21.5 48 48 48 48-21.5 48-48-21.5-48-48-48zm-496 0c-26.5 0-48 21.5-48 48s21.5 48 48 48 48-21.5 48-48-21.5-48-48-48zm368 0H192v-32h272v32z"
 
 # --- INYECCIÓN DE CSS ---
@@ -26,7 +24,7 @@ st.markdown("""
     div[data-baseweb="select"] > div { background-color: #FFD700 !important; color: black !important; border-radius: 8px !important; border: 1px solid white !important; }
     div[data-baseweb="select"] div, div[data-baseweb="select"] span, div[data-baseweb="select"] svg { color: black !important; fill: black !important; }
 
-    /* 4. Tarjetas Blancas */
+    /* 4. Tarjetas Blancas (SOLO para Tabla y Gráfico 1) */
     .white-card-container {
         background-color: white;
         padding: 20px;
@@ -34,7 +32,7 @@ st.markdown("""
         margin-bottom: 20px;
         box-shadow: 0 4px 8px rgba(255, 215, 0, 0.1);
     }
-    .white-card-container h4 { color: black !important; } /* Título negro dentro de tarjeta */
+    .white-card-container h4 { color: black !important; } 
     
     /* Tabla Estilizada */
     .tabla-final { width: 100%; border-collapse: collapse; font-family: Arial, sans-serif; color: black !important; }
@@ -44,30 +42,39 @@ st.markdown("""
     /* Plotly */
     div[data-testid="stPlotlyChart"] { background-color: white; border-radius: 20px; overflow: hidden; padding: 10px; }
 
-    /* --- NUEVO ESTILO: GRÁFICO DE ISOTIPOS VERTICALES (COLUMNAS) --- */
-    .chart-container {
+    /* --- ESTILOS PARA GRÁFICOS DE ICONOS (Fondo Negro/Transparente) --- */
+    .icon-chart-container {
         display: flex;
         flex-direction: row;
         justify-content: space-around;
-        align-items: flex-end; /* Alinear al fondo para efecto gráfico */
+        align-items: flex-end;
         flex-wrap: wrap;
         padding-top: 20px;
         padding-bottom: 20px;
+        /* Sin fondo blanco */
     }
     
     .chart-column {
         display: flex;
         flex-direction: column;
         align-items: center;
-        width: 80px; /* Ancho de cada columna */
+        width: 80px;
         margin: 5px;
     }
 
+    /* Texto de valor y código en BLANCO */
     .value-label {
         font-weight: bold;
-        color: black;
+        color: white !important; /* BLANCO */
         font-size: 1.2em;
         margin-bottom: 5px;
+    }
+    .code-label {
+        margin-top: 8px;
+        font-weight: bold;
+        color: white !important; /* BLANCO */
+        font-size: 0.9em;
+        text-align: center;
     }
 
     /* Contenedor del Icono */
@@ -77,63 +84,53 @@ st.markdown("""
         height: 60px;
     }
 
-    /* Fondo Gris (Icono vacío) */
+    /* Fondo del Icono (Gris Oscuro para que se vea en negro) */
     .icon-bg {
         position: absolute;
         top: 0; left: 0;
         width: 60px; height: 60px;
-        fill: #e0e0e0;
+        fill: #333333; /* Gris oscuro */
     }
 
-    /* Frente Amarillo (Icono lleno) con recorte vertical */
+    /* Frente Amarillo (Icono lleno) */
     .icon-fill {
         position: absolute;
-        bottom: 0; /* Anclado al fondo */
+        bottom: 0;
         left: 0;
-        width: 60px; /* Ancho completo */
-        overflow: hidden; /* Recorta lo que sobre hacia arriba */
+        width: 60px;
+        overflow: hidden;
         transition: height 0.5s ease;
     }
     
-    /* El SVG dentro del contenedor recortado */
     .icon-fill svg {
         position: absolute;
-        bottom: 0; /* El SVG se queda quieto abajo */
+        bottom: 0;
         left: 0;
         width: 60px;
         height: 60px;
         fill: #FFD700; /* Amarillo */
     }
-
-    .code-label {
-        margin-top: 8px;
-        font-weight: bold;
-        color: black;
-        font-size: 0.9em;
-        text-align: center;
-    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- FUNCIÓN GENERADORA DE HTML VERTICAL (TIPO BARRAS) ---
+# --- FUNCIÓN GENERADORA DE HTML VERTICAL ---
 def generar_html_isotipo_vertical(df_top, col_id, col_valor, svg_path, viewBox_cfg):
     """
-    Genera un gráfico de columnas donde cada columna es un icono que se llena de abajo hacia arriba.
+    Genera un gráfico de columnas de iconos sobre fondo transparente.
     """
     if df_top.empty:
-        return "<div class='white-card-container'><h4>No hay datos.</h4></div>"
+        return "<div class='icon-chart-container'><h4 style='color:white !important;'>No hay datos.</h4></div>"
     
     max_valor = df_top[col_valor].max()
     
-    # Inicio contenedor blanco
-    html_output = "<div class='white-card-container'><div class='chart-container'>"
+    # Inicio contenedor transparente
+    html_output = "<div class='icon-chart-container'>"
     
     for index, row in df_top.iterrows():
         codigo = row[col_id]
         valor = row[col_valor]
         porcentaje = (valor / max_valor * 100) if max_valor > 0 else 0
         
-        # HTML MINIFICADO SIN ESPACIOS EXCESIVOS
         html_output += f"""
 <div class="chart-column">
 <div class="value-label">{valor}</div>
@@ -146,7 +143,7 @@ def generar_html_isotipo_vertical(df_top, col_id, col_valor, svg_path, viewBox_c
 <div class="code-label">{codigo}</div>
 </div>"""
     
-    html_output += "</div></div>"
+    html_output += "</div>"
     return html_output
 
 # ==============================================================================
@@ -243,7 +240,7 @@ if uploaded_file is not None:
             st.warning("No hay datos para Clientes No Modulados.")
 
         # ==========================================
-        # SECCIÓN 3: REINCIDENCIAS CLIENTES (BARRAS DE ICONOS)
+        # SECCIÓN 3: REINCIDENCIAS CLIENTES
         # ==========================================
         st.markdown("---")
         st.header("REINCIDENCIAS - CLIENTES")
@@ -272,7 +269,7 @@ if uploaded_file is not None:
                 top.columns = ['Client', 'Cantidad']
                 top = top.sort_values(by='Cantidad', ascending=False).head(10)
                 
-                # HTML SVG PERSONA (Viewbox 0 0 448 512)
+                # Render SVG Personas (Sin fondo blanco)
                 html_clientes = generar_html_isotipo_vertical(top, 'Client', 'Cantidad', SVG_PERSONA, "0 0 448 512")
                 st.markdown(html_clientes, unsafe_allow_html=True) 
                 
@@ -280,7 +277,7 @@ if uploaded_file is not None:
                 st.info("No se encontraron datos.")
 
         # ==========================================
-        # SECCIÓN 4: REINCIDENCIAS CAMIONES (BARRAS DE ICONOS)
+        # SECCIÓN 4: REINCIDENCIAS CAMIONES
         # ==========================================
         st.markdown("---")
         st.header("REINCIDENCIAS - CAMIONES")
@@ -310,7 +307,7 @@ if uploaded_file is not None:
                     top_cam.columns = ['Cam', 'Cantidad']
                     top_cam = top_cam.sort_values(by='Cantidad', ascending=False).head(10)
 
-                    # HTML SVG CAMION (Viewbox 0 0 640 512)
+                    # Render SVG Camiones (Sin fondo blanco)
                     html_camiones = generar_html_isotipo_vertical(top_cam, 'Cam', 'Cantidad', SVG_CAMION, "0 0 640 512")
                     st.markdown(html_camiones, unsafe_allow_html=True)
                     

@@ -58,7 +58,7 @@ st.markdown("""
         display: flex;
         flex-direction: column;
         align-items: center;
-        width: 80px;
+        width: 100px; /* Un poco más ancho ahora que son menos elementos */
         margin: 5px;
     }
 
@@ -66,29 +66,29 @@ st.markdown("""
     .value-label {
         font-weight: bold;
         color: white !important; /* BLANCO */
-        font-size: 1.2em;
+        font-size: 1.3em;
         margin-bottom: 5px;
     }
     .code-label {
-        margin-top: 8px;
+        margin-top: 10px;
         font-weight: bold;
         color: white !important; /* BLANCO */
-        font-size: 0.9em;
+        font-size: 1.0em;
         text-align: center;
     }
 
-    /* Contenedor del Icono */
+    /* Contenedor del Icono (Más grande para Top 5) */
     .icon-box {
         position: relative;
-        width: 60px;
-        height: 60px;
+        width: 80px;  /* Aumentado de 60px a 80px */
+        height: 80px;
     }
 
     /* Fondo del Icono (Gris Oscuro para que se vea en negro) */
     .icon-bg {
         position: absolute;
         top: 0; left: 0;
-        width: 60px; height: 60px;
+        width: 80px; height: 80px;
         fill: #333333; /* Gris oscuro */
     }
 
@@ -97,7 +97,7 @@ st.markdown("""
         position: absolute;
         bottom: 0;
         left: 0;
-        width: 60px;
+        width: 80px;
         overflow: hidden;
         transition: height 0.5s ease;
     }
@@ -106,8 +106,8 @@ st.markdown("""
         position: absolute;
         bottom: 0;
         left: 0;
-        width: 60px;
-        height: 60px;
+        width: 80px;
+        height: 80px;
         fill: #FFD700; /* Amarillo */
     }
     </style>
@@ -244,7 +244,7 @@ if uploaded_file is not None:
         # ==========================================
         st.markdown("---")
         st.header("REINCIDENCIAS - CLIENTES")
-        st.subheader("Top 10 Clientes más reincidentes (Días únicos)")
+        st.subheader("Top 5 Clientes más reincidentes (Días únicos)")
 
         if not df_no_mod.empty:
             col_filt_re, col_blank = st.columns([1, 3])
@@ -267,7 +267,8 @@ if uploaded_file is not None:
             if not df_filt.empty:
                 top = df_filt['Client'].value_counts().reset_index()
                 top.columns = ['Client', 'Cantidad']
-                top = top.sort_values(by='Cantidad', ascending=False).head(10)
+                # TOP 5
+                top = top.sort_values(by='Cantidad', ascending=False).head(5)
                 
                 # Render SVG Personas (Sin fondo blanco)
                 html_clientes = generar_html_isotipo_vertical(top, 'Client', 'Cantidad', SVG_PERSONA, "0 0 448 512")
@@ -281,7 +282,7 @@ if uploaded_file is not None:
         # ==========================================
         st.markdown("---")
         st.header("REINCIDENCIAS - CAMIONES")
-        st.subheader("Top 10 Camiones con más incidencias (Días únicos)")
+        st.subheader("Top 5 Camiones con más incidencias (Días únicos)")
 
         if not df_no_mod.empty:
             col_filt_cam, col_blank_cam = st.columns([1, 3])
@@ -305,7 +306,8 @@ if uploaded_file is not None:
                 if not df_filt_cam.empty:
                     top_cam = df_filt_cam['Cam'].value_counts().reset_index()
                     top_cam.columns = ['Cam', 'Cantidad']
-                    top_cam = top_cam.sort_values(by='Cantidad', ascending=False).head(10)
+                    # TOP 5
+                    top_cam = top_cam.sort_values(by='Cantidad', ascending=False).head(5)
 
                     # Render SVG Camiones (Sin fondo blanco)
                     html_camiones = generar_html_isotipo_vertical(top_cam, 'Cam', 'Cantidad', SVG_CAMION, "0 0 640 512")

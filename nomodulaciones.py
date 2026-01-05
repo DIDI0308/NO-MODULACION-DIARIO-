@@ -1,97 +1,147 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
+# Nota: Ya no necesitamos plotly.express para las secciones 3 y 4, 
+# pero lo mantenemos por si se usa en la sección 1.
+import plotly.express as px 
 
 # Configuración de página
 st.set_page_config(page_title="Reporte de modulación", layout="wide")
+
+# --- DEFINICIÓN DE ICONOS SVG (PATHS) ---
+# Usaremos estos caminos SVG para dibujar los iconos de persona y camión.
+SVG_PERSONA = "M256 0c70.7 0 128 57.3 128 128s-57.3 128-128 128S0 198.7 0 128 57.3 0 128 0zm0 304c118.6 0 222.5 58.5 269.3 143 7.9 14.2 1.7 32.1-13.7 39.7-6.9 3.4-14.5 5.1-22 5.1-8.1 0-16.3-2-23.6-6.1-34.8-19.7-74.8-30.7-117-30.7-41.8 0-81.4 10.8-116.2 30.3-14.8 8.3-33.7 2.9-42.2-11.7-8.4-14.6-3.4-33.6 11.3-42.1C112.6 347.1 181.7 304 256 304z"
+SVG_CAMION = "M624 352h-16V243.9c0-12.7-5.1-24.9-14.1-33.9L494 110.1c-9-9-21.2-14.1-33.9-14.1H416V48c0-26.5-21.5-48-48-48H48C21.5 0 0 21.5 0 48v320c0 26.5 21.5 48 48 48h16c0 53 43 96 96 96s96-43 96-96h128c0 53 43 96 96 96s96-43 96-96h48c26.5 0 48-21.5 48-48v-64c0-26.5-21.5-48-48-48zm-16-224h-64V64h64v64zm48 224c-26.5 0-48 21.5-48 48s21.5 48 48 48 48-21.5 48-48-21.5-48-48-48zm-496 0c-26.5 0-48 21.5-48 48s21.5 48 48 48 48-21.5 48-48-21.5-48-48-48zm368 0H192v-32h272v32z"
 
 # --- INYECCIÓN DE CSS (ESTILOS VISUALES) ---
 st.markdown("""
     <style>
     /* 1. Fondo Global Negro */
-    .stApp {
-        background-color: #000000;
-    }
+    .stApp { background-color: #000000; }
 
     /* 2. Textos Generales: Títulos y Subtítulos en AMARILLO */
-    h1, h2, h3, h4, h5, .stMarkdown h3 {
-        color: #FFD700 !important;
-    }
+    h1, h2, h3, h4, h5, .stMarkdown h3 { color: #FFD700 !important; }
     
     /* 3. Estilo de Etiquetas (Labels) */
-    .stSelectbox label, .stFileUploader label, p {
-        color: #FFD700 !important;
-        font-weight: bold;
-    }
+    .stSelectbox label, .stFileUploader label, p { color: #FFD700 !important; font-weight: bold; }
 
     /* 4. BOTONES Y FILTROS (Amarillo con Texto Negro) */
-    
-    /* Botones generales (incluye el de subir archivo) */
-    div.stButton > button {
-        background-color: #FFD700 !important;
-        color: black !important;
-        border: none !important;
-        border-radius: 8px !important;
-        font-weight: bold !important;
-    }
+    div.stButton > button { background-color: #FFD700 !important; color: black !important; border: none !important; border-radius: 8px !important; font-weight: bold !important; }
+    div[data-baseweb="select"] > div { background-color: #FFD700 !important; color: black !important; border-radius: 8px !important; border: 1px solid white !important; }
+    div[data-baseweb="select"] div, div[data-baseweb="select"] span, div[data-baseweb="select"] svg { color: black !important; fill: black !important; }
 
-    /* Caja de selección (Selectbox - Input principal) */
-    div[data-baseweb="select"] > div {
-        background-color: #FFD700 !important;
-        color: black !important;
-        border-radius: 8px !important;
-        border: 1px solid white !important;
-    }
-    
-    /* Texto dentro del Selectbox */
-    div[data-baseweb="select"] div, 
-    div[data-baseweb="select"] span, 
-    div[data-baseweb="select"] svg {
-        color: black !important;
-        fill: black !important; /* Para la flechita */
-    }
-
-    /* 5. Estilo de la Tabla (Dentro de tarjeta blanca redondeada) */
-    .tabla-container {
+    /* 5. Estilos para Contenedores Blancos (Tablas y Gráficas) */
+    .white-card-container {
         background-color: white;
         padding: 20px;
         border-radius: 20px;
         margin-bottom: 20px;
         box-shadow: 0 4px 8px rgba(255, 215, 0, 0.1);
+        color: black !important; /* Texto negro dentro de las tarjetas */
     }
     
-    .tabla-final {
-        width: 100%;
-        border-collapse: collapse;
-        font-family: Arial, sans-serif;
-        color: black !important;
-    }
-    .tabla-final thead th {
-        background-color: #FFD700 !important;
-        color: black !important;
-        text-align: center !important;
-        padding: 12px !important;
-        border-top-left-radius: 10px;
-        border-top-right-radius: 10px;
-    }
-    .tabla-final tbody td {
-        background-color: white !important;
-        color: black !important;
-        text-align: center !important;
-        padding: 10px !important;
-        border-bottom: 1px solid #eee !important;
-    }
+    /* Estilos de Tabla */
+    .tabla-final { width: 100%; border-collapse: collapse; font-family: Arial, sans-serif; color: black !important; }
+    .tabla-final thead th { background-color: #FFD700 !important; color: black !important; text-align: center !important; padding: 12px !important; border-top-left-radius: 10px; border-top-right-radius: 10px; }
+    .tabla-final tbody td { background-color: white !important; color: black !important; text-align: center !important; padding: 10px !important; border-bottom: 1px solid #eee !important; }
 
-    /* 6. Estilo para redondear el contenedor de las gráficas Plotly */
-    div[data-testid="stPlotlyChart"] {
-        background-color: white;
-        border-radius: 20px;
-        overflow: hidden;
-        padding: 10px;
-        box-shadow: 0 4px 8px rgba(255, 215, 0, 0.1);
+    /* Estilos para Plotly estándar (Sección 1) */
+    div[data-testid="stPlotlyChart"] { background-color: white; border-radius: 20px; overflow: hidden; padding: 10px; box-shadow: 0 4px 8px rgba(255, 215, 0, 0.1); }
+
+    /* --- NUEVOS ESTILOS PARA LOS ISOTIPOS (Secciones 3 y 4) --- */
+    .isotype-row {
+        display: flex;
+        align-items: center;
+        margin-bottom: 15px;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 10px;
+    }
+    .isotype-label {
+        flex: 0 0 120px; /* Ancho fijo para el código */
+        font-weight: bold;
+        color: black;
+    }
+    /* El truco del icono que se llena: Dos iconos superpuestos */
+    .icon-wrapper {
+        position: relative;
+        width: 50px;  /* Tamaño del icono */
+        height: 50px;
+        margin-right: 15px;
+    }
+    /* Icono de fondo (Gris vacío) */
+    .icon-bg {
+        position: absolute; top: 0; left: 0;
+        width: 50px; height: 50px;
+        fill: #e0e0e0; /* Gris claro */
+    }
+    /* Contenedor que recorta el icono frontal */
+    .icon-fill-container {
+        position: absolute; top: 0; left: 0;
+        height: 50px;
+        overflow: hidden; /* Esto hace la magia del recorte */
+        transition: width 0.5s ease;
+    }
+    /* Icono frontal (Amarillo lleno) */
+    .icon-fg {
+        width: 50px; height: 50px;
+        fill: #FFD700; /* Amarillo */
+    }
+    .isotype-value {
+        font-weight: bold;
+        color: black;
+        font-size: 1.2em;
     }
     </style>
     """, unsafe_allow_html=True)
+
+# --- FUNCIÓN AUXILIAR PARA GENERAR EL HTML DE LOS ISOTIPOS ---
+def generar_html_isotipo(df_top, col_id, col_valor, svg_path, viewBox_cfg):
+    """
+    Genera HTML crudo para mostrar una lista de isotipos que se llenan.
+    df_top: DataFrame con el top 10.
+    col_id: Nombre de la columna con el ID (Client o Cam).
+    col_valor: Nombre de la columna con el valor numérico ('Cantidad').
+    svg_path: El string del path SVG.
+    viewBox_cfg: Configuración del viewBox para el SVG específico.
+    """
+    if df_top.empty:
+        return "<div class='white-card-container'>No hay datos.</div>"
+    
+    # Calculamos el máximo para determinar los porcentajes de llenado relativo
+    max_valor = df_top[col_valor].max()
+    
+    html_output = "<div class='white-card-container'>"
+    
+    for index, row in df_top.iterrows():
+        codigo = row[col_id]
+        valor = row[col_valor]
+        # Porcentaje relativo al máximo valor del grupo (evita división por cero)
+        porcentaje = (valor / max_valor * 100) if max_valor > 0 else 0
+        
+        html_output += f"""
+        <div class="isotype-row">
+            <div class="isotype-label">{codigo}</div>
+            
+            <div class="icon-wrapper">
+                <svg class="icon-bg" viewBox="{viewBox_cfg}" xmlns="http://www.w3.org/2000/svg">
+                    <path d="{svg_path}"/>
+                </svg>
+                
+                <div class="icon-fill-container" style="width: {porcentaje}%;">
+                    <svg class="icon-fg" viewBox="{viewBox_cfg}" xmlns="http://www.w3.org/2000/svg">
+                        <path d="{svg_path}"/>
+                    </svg>
+                </div>
+            </div>
+            
+            <div class="isotype-value">{valor}</div>
+        </div>
+        """
+    html_output += "</div>"
+    return html_output
+
+# ==============================================================================
+# INICIO DE LA APLICACIÓN PRINCIPAL
+# ==============================================================================
 
 st.title("ADH MODULACIÓN CD EA")
 
@@ -99,7 +149,7 @@ uploaded_file = st.file_uploader("Sube tu archivo Excel", type=['xlsx'])
 
 if uploaded_file is not None:
     try:
-        # --- CARGA Y PROCESAMIENTO ---
+        # --- CARGA Y PROCESAMIENTO INICIAL ---
         df = pd.read_excel(uploaded_file, sheet_name="3.30.8")
         df.columns = df.columns.str.strip()
 
@@ -123,7 +173,7 @@ if uploaded_file is not None:
         ultima_fecha = df_base['Entrega'].max()
 
         # ==========================================
-        # SECCIÓN 1: GRÁFICO EVOLUCIÓN
+        # SECCIÓN 1: GRÁFICO EVOLUCIÓN (Mantiene Plotly estándar)
         # ==========================================
         st.markdown("### Evolución de Modulación")
         opcion_graf = st.selectbox("Selecciona el periodo:", ["Últimos 7 días", "Mes Actual", "Histórico"], key="opt_evol")
@@ -174,7 +224,7 @@ if uploaded_file is not None:
             cols = [c for c in ['Client', 'Cam', 'F.Pedido', 'Motivo'] if c in resultado.columns]
 
             html_tabla = f"""
-            <div class="tabla-container">
+            <div class="white-card-container">
                 <h4 style="color:black !important; margin-top:0;">Clientes encontrados: {len(resultado)}</h4>
                 {resultado[cols].to_html(index=False, classes='tabla-final')}
             </div>
@@ -184,11 +234,11 @@ if uploaded_file is not None:
             st.warning("No hay datos para Clientes No Modulados.")
 
         # ==========================================
-        # SECCIÓN 3: REINCIDENCIAS CLIENTES
+        # SECCIÓN 3: REINCIDENCIAS CLIENTES (ISOTIPO PERSONA)
         # ==========================================
         st.markdown("---")
-        st.header("REINCIDENCIAS")
-        st.subheader("Top 10 Clientes más reincidentes")
+        st.header("REINCIDENCIAS - CLIENTES")
+        st.subheader("Top 10 Clientes más reincidentes (Días únicos)")
 
         if not df_no_mod.empty:
             col_filt_re, col_blank = st.columns([1, 3])
@@ -214,29 +264,21 @@ if uploaded_file is not None:
                 top = df_filt['Client'].value_counts().reset_index()
                 top.columns = ['Client', 'Cantidad']
                 top = top.sort_values(by='Cantidad', ascending=False).head(10)
-
-                fig_re = px.bar(top, x='Client', y='Cantidad', text='Cantidad', title=f"Top 10 Clientes ({opcion_reinc})", color_discrete_sequence=['#FFD700'])
                 
-                max_val = top['Cantidad'].max()
-                limite_sup = 10 if max_val <= 10 else (max_val + 1)
-
-                fig_re.update_layout(
-                    paper_bgcolor='white', plot_bgcolor='white', font={'color': 'black'},
-                    margin=dict(t=50, l=50, r=50, b=50),
-                    xaxis_title="Código Cliente", yaxis_title="Días con Incidencia",
-                    xaxis=dict(type='category', showgrid=False),
-                    yaxis=dict(range=[0, limite_sup], dtick=1, showgrid=False)
-                )
-                fig_re.update_traces(texttemplate='%{text}', textposition='outside')
-                st.plotly_chart(fig_re, use_container_width=True)
+                # --- GENERACIÓN DEL GRÁFICO DE ISOTIPOS (PERSONA) ---
+                # Usamos la función auxiliar, pasando el path de persona y su viewBox correcto
+                html_clientes = generar_html_isotipo(top, 'Client', 'Cantidad', SVG_PERSONA, "0 0 512 512")
+                st.markdown(html_clientes, unsafe_allow_html=True)
+                
             else:
                 st.info("No se encontraron datos.")
 
         # ==========================================
-        # SECCIÓN 4: REINCIDENCIAS CAMIONES (NUEVO)
+        # SECCIÓN 4: REINCIDENCIAS CAMIONES (ISOTIPO CAMIÓN)
         # ==========================================
         st.markdown("---")
-        st.subheader("Top 10 Camiones con más incidencias")
+        st.header("REINCIDENCIAS - CAMIONES")
+        st.subheader("Top 10 Camiones con más incidencias (Días únicos)")
 
         if not df_no_mod.empty:
             col_filt_cam, col_blank_cam = st.columns([1, 3])
@@ -244,7 +286,6 @@ if uploaded_file is not None:
                 opcion_cam = st.selectbox("Periodo Camiones:", ["Últimos 7 días", "Mes Actual", "Último Año"], key="opt_reinc_cam")
             
             df_cam = df_no_mod.copy()
-            # Limpieza columna Cam
             if 'Cam' in df_cam.columns:
                 df_cam['Cam'] = df_cam['Cam'].apply(lambda x: str(int(float(x))) if pd.notna(x) and str(x).replace('.','').isdigit() else str(x))
                 
@@ -265,20 +306,11 @@ if uploaded_file is not None:
                     top_cam.columns = ['Cam', 'Cantidad']
                     top_cam = top_cam.sort_values(by='Cantidad', ascending=False).head(10)
 
-                    fig_cam = px.bar(top_cam, x='Cam', y='Cantidad', text='Cantidad', title=f"Top 10 Camiones ({opcion_cam})", color_discrete_sequence=['#FFD700'])
+                    # --- GENERACIÓN DEL GRÁFICO DE ISOTIPOS (CAMIÓN) ---
+                    # Usamos la función auxiliar, pasando el path de camión y su viewBox correcto
+                    html_camiones = generar_html_isotipo(top_cam, 'Cam', 'Cantidad', SVG_CAMION, "0 0 640 512")
+                    st.markdown(html_camiones, unsafe_allow_html=True)
                     
-                    max_val_cam = top_cam['Cantidad'].max()
-                    limite_sup_cam = 10 if max_val_cam <= 10 else (max_val_cam + 1)
-
-                    fig_cam.update_layout(
-                        paper_bgcolor='white', plot_bgcolor='white', font={'color': 'black'},
-                        margin=dict(t=50, l=50, r=50, b=50),
-                        xaxis_title="Código Camión", yaxis_title="Días con Incidencia",
-                        xaxis=dict(type='category', showgrid=False),
-                        yaxis=dict(range=[0, limite_sup_cam], dtick=1, showgrid=False)
-                    )
-                    fig_cam.update_traces(texttemplate='%{text}', textposition='outside')
-                    st.plotly_chart(fig_cam, use_container_width=True)
                 else:
                     st.info("No se encontraron reincidencias de camiones en el periodo seleccionado.")
             else:
